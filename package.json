@@ -1,0 +1,26 @@
+{
+  "name": "swapify",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Swapify - a barter marketplace where users swap items and balance value differences with tokens",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "dev": "npm run dev --workspaces --if-present",
+    "dev:api": "npm run dev -w @swapify/api",
+    "dev:web": "npm run dev -w @swapify/web",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "db:generate": "npm run db:generate -w @swapify/db",
+    "db:migrate": "npm run db:migrate -w @swapify/db -- --name dev",
+    "db:seed": "npm run db:seed -w @swapify/db",
+    "docker:up": "docker compose -f infra/docker-compose.yml up -d",
+    "docker:down": "docker compose -f infra/docker-compose.yml down"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

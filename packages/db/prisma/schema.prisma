@@ -1,0 +1,322 @@
+// Swapify data model
+//
+// Conventions:
+// - All token amounts are stored as BigInt "micro-tokens" (1 token = 1,000,000 micro-tokens).
+//   This avoids floating-point errors, the same way Stripe stores money in cents.
+// - Every token movement is recorded in the append-only TokenTransaction ledger.
+//   Wallet.balance is derived from this ledger and only cached there for fast reads.
+// - Model names use PascalCase; fields use camelCase.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Users & identity
+// ---------------------------------------------------------------------------
+
+enum AdminRole {
+  SUPER_ADMIN
+  MODERATOR
+  SUPPORT
+}
+
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  name      String
+  bio       String?
+  imageUrl  String?
+  // Subject ID from AWS Cognito once authentication is wired up (Sprint 1).
+  cognitoSub String?  @unique
+  wallet    Wallet?
+  items     Item[]
+  wishlists Wishlist[]
+  admin     Admin?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([createdAt])
+}
+
+model Admin {
+  id     String    @id @default(cuid())
+  userId String    @unique
+  role   AdminRole @default(SUPPORT)
+  user   User      @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Wallets & the token ledger
+// ---------------------------------------------------------------------------
+
+model Wallet {
+  id                String             @id @default(cuid())
+  userId            String             @unique
+  user              User               @relation(fields: [userId], references: [id])
+  // Current balance in micro-tokens. Cached value; the source of truth is the ledger.
+  balanceMicroTokens BigInt            @default(0)
+  // Optimistic-locking guard so concurrent transfers never lose money.
+  version           Int                @default(0)
+  transactions      TokenTransaction[]
+  escrowHolds       EscrowHold[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum TransactionDirection {
+  CREDIT
+  DEBIT
+}
+
+enum TransactionType {
+  SWAP_GAP       // token difference paid to complete a swap
+  PURCHASE       // tokens bought with real money
+  EARN           // tokens earned from completing a swap or a referral
+  ESCROW_HOLD    // tokens moved into escrow during a swap
+  ESCROW_RELEASE // escrow settled to the correct party
+  ESCROW_REFUND  // escrow returned to the payer
+  ADJUSTMENT     // manual correction by an admin
+}
+
+/// Append-only ledger. Rows are never updated or deleted.
+model TokenTransaction {
+  id                String               @id @default(cuid())
+  walletId          String
+  wallet            Wallet               @relation(fields: [walletId], references: [id])
+  type              TransactionType
+  direction         TransactionDirection
+  // Always a positive magnitude, in micro-tokens.
+  amountMicroTokens BigInt
+  // Wallet balance after this transaction applied (micro-tokens).
+  balanceAfterMicroTokens BigInt
+  // Optional external reference: swap id, Stripe payment id, etc.
+  referenceId       String?
+  note              String?
+  // Guarantees the same operation is never applied twice.
+  idempotencyKey    String?              @unique
+
+  createdAt DateTime @default(now())
+
+  @@index([walletId, createdAt(sort: Desc)])
+  @@index([type])
+  @@index([referenceId])
+}
+
+// ---------------------------------------------------------------------------
+// Listings
+// ---------------------------------------------------------------------------
+
+enum Category {
+  ELECTRONICS
+  FURNITURE
+  CLOTHING
+  BOOKS
+  GAMES
+  TOOLS
+  SPORTS
+  HOME_KITCHEN
+  COLLECTIBLES
+  OTHER
+}
+
+enum Condition {
+  NEW
+  LIKE_NEW
+  GOOD
+  FAIR
+  POOR
+}
+
+enum ItemStatus {
+  ACTIVE
+  RESERVED // currently involved in an in-progress swap
+  SWAPPED
+  HIDDEN
+  DELETED
+}
+
+model Item {
+  id            String       @id @default(cuid())
+  ownerId       String
+  owner         User         @relation(fields: [ownerId], references: [id])
+  title         String
+  description   String
+  category      Category
+  condition     Condition
+  // Owner-set value in micro-tokens. Manual for now; an AI valuation service
+  // will plug in later without changing this model.
+  valueMicroTokens BigInt
+  status        ItemStatus   @default(ACTIVE)
+  images        ItemImage[]
+  offeredInSwaps  Swap[]      @relation("OfferedItem")
+  requestedInSwaps Swap[]     @relation("RequestedItem")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+  @@index([category, status])
+  @@index([status])
+}
+
+model ItemImage {
+  id     String @id @default(cuid())
+  itemId String
+  item   Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  // Object key in S3 once the image pipeline is live (Sprint 8).
+  url    String
+  position Int   @default(0)
+
+  @@unique([itemId, position])
+}
+
+// ---------------------------------------------------------------------------
+// Swaps, escrow & value balancing
+// ---------------------------------------------------------------------------
+
+enum SwapStatus {
+  REQUESTED
+  AGREED
+  ESCROWED
+  SHIPPED
+  COMPLETED
+  CANCELLED
+  EXPIRED
+}
+
+enum GapPayer {
+  OFFERING_USER // the person offering an item pays the value gap
+  REQUESTING_USER // the person requesting the swap pays the value gap
+  NONE // values are equal, no gap
+}
+
+model Swap {
+  id             String     @id @default(cuid())
+  offeringUserId String
+  offeringItemId String
+  offeringItem   Item       @relation("OfferedItem", fields: [offeringItemId], references: [id])
+  requestedUserId String
+  requestedItemId String
+  requestedItem  Item       @relation("RequestedItem", fields: [requestedItemId], references: [id])
+  // Value difference in micro-tokens (absolute value).
+  gapMicroTokens BigInt     @default(0)
+  gapPayer       GapPayer   @default(NONE)
+  status         SwapStatus @default(REQUESTED)
+  escrow         EscrowHold?
+
+  trackingNumber String?
+  carrier        String?
+
+  messages       Message[]
+  ratings        Rating[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  completedAt DateTime?
+  cancelledAt  DateTime?
+  expiresAt    DateTime?
+
+  @@index([offeringUserId])
+  @@index([requestedUserId])
+  @@index([status])
+}
+
+enum EscrowStatus {
+  HELD
+  RELEASED
+  REFUNDED
+}
+
+model EscrowHold {
+  id          String       @id @default(cuid())
+  swapId      String       @unique
+  swap        Swap         @relation(fields: [swapId], references: [id], onDelete: Cascade)
+  walletId    String
+  wallet      Wallet       @relation(fields: [walletId], references: [id])
+  // Held amount in micro-tokens.
+  amountMicroTokens BigInt
+  status      EscrowStatus @default(HELD)
+
+  heldAt     DateTime @default(now())
+  releasedAt DateTime?
+  refundedAt DateTime?
+}
+
+// ---------------------------------------------------------------------------
+// Messaging, ratings, wishlists, notifications
+// ---------------------------------------------------------------------------
+
+model Message {
+  id       String @id @default(cuid())
+  swapId   String
+  swap     Swap   @relation(fields: [swapId], references: [id], onDelete: Cascade)
+  senderId String
+  body     String
+
+  createdAt DateTime @default(now())
+
+  @@index([swapId, createdAt])
+}
+
+model Rating {
+  id      String @id @default(cuid())
+  swapId  String
+  swap    Swap   @relation(fields: [swapId], references: [id], onDelete: Cascade)
+  raterId String
+  rateeId String
+  // 1-5 stars
+  score   Int
+  comment String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([swapId, raterId])
+  @@index([rateeId])
+}
+
+model Wishlist {
+  id          String @id @default(cuid())
+  userId      String
+  user        User   @relation(fields: [userId], references: [id])
+  title       String
+  description String?
+  // Optional ceiling for what the user is willing to spend on the gap.
+  maxValueMicroTokens BigInt?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+enum NotificationType {
+  SWAP_REQUEST
+  SWAP_UPDATE
+  MESSAGE
+  RATING
+  ESCROW
+  SYSTEM
+}
+
+model Notification {
+  id     String           @id @default(cuid())
+  userId String
+  type   NotificationType
+  body   String
+  read   Boolean          @default(false)
+  // Optional deep-link target (e.g. swap id).
+  referenceId String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, read])
+}
