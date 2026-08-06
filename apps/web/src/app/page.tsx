@@ -10,6 +10,20 @@ export default function Home() {
           match, our tokens balance the difference.
         </p>
       </div>
+      <div className="flex items-center gap-4">
+        <a
+          href="/browse"
+          className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500"
+        >
+          Browse listings
+        </a>
+        <a
+          href="/post"
+          className="rounded-md border border-gray-600 px-4 py-2 text-sm font-semibold text-gray-200 hover:bg-gray-700"
+        >
+          Post an item
+        </a>
+      </div>
       <AuthControls />
     </main>
   );

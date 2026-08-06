@@ -2,6 +2,7 @@ import Fastify, { FastifyInstance } from 'fastify';
 import { jsonWithBigInt } from '@swapify/db';
 import { healthRoutes } from './routes/health.js';
 import { authRoutes } from './routes/auth.js';
+import { itemsRoutes } from './routes/items.js';
 import authPlugin from './plugins/auth.js';
 
 export async function buildApp(): Promise<FastifyInstance> {
@@ -18,6 +19,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   app.register(authPlugin);
   app.register(healthRoutes);
   app.register(authRoutes);
+  app.register(itemsRoutes);
 
   return app;
 }

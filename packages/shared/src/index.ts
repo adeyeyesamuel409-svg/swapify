@@ -6,6 +6,43 @@ export function tokensToMicroTokens(tokens: number | bigint): bigint {
   return BigInt(tokens) * MICRO_TOKENS_PER_TOKEN;
 }
 
-export function microTokensToTokens(microTokens: bigint): number {
-  return Number(microTokens) / Number(MICRO_TOKENS_PER_TOKEN);
+export function microTokensToTokens(microTokens: bigint | string): number {
+  return Number(BigInt(microTokens)) / Number(MICRO_TOKENS_PER_TOKEN);
 }
+
+// Display metadata shared by the API and web app.
+export const CATEGORIES = [
+  'ELECTRONICS',
+  'FURNITURE',
+  'CLOTHING',
+  'BOOKS',
+  'GAMES',
+  'TOOLS',
+  'SPORTS',
+  'HOME_KITCHEN',
+  'COLLECTIBLES',
+  'OTHER',
+] as const;
+
+export const CONDITIONS = ['NEW', 'LIKE_NEW', 'GOOD', 'FAIR', 'POOR'] as const;
+
+export const CATEGORY_LABELS: Record<(typeof CATEGORIES)[number], string> = {
+  ELECTRONICS: 'Electronics',
+  FURNITURE: 'Furniture',
+  CLOTHING: 'Clothing',
+  BOOKS: 'Books',
+  GAMES: 'Games',
+  TOOLS: 'Tools',
+  SPORTS: 'Sports',
+  HOME_KITCHEN: 'Home & Kitchen',
+  COLLECTIBLES: 'Collectibles',
+  OTHER: 'Other',
+};
+
+export const CONDITION_LABELS: Record<(typeof CONDITIONS)[number], string> = {
+  NEW: 'New',
+  LIKE_NEW: 'Like new',
+  GOOD: 'Good',
+  FAIR: 'Fair',
+  POOR: 'Poor',
+};
