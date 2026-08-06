@@ -13,13 +13,13 @@ Legend: [ ] not started · [x] done · [-] in progress
 - [x] CI skeleton (lint + typecheck) and env setup
 
 ## Sprint 1 - Authentication (AWS Cognito)
-- [ ] Provision Cognito user pool + app client
-- [ ] Configure AWS credentials and Secrets Manager
-- [ ] Wire Cognito JWT verification into the API (JWT strategy)
-- [ ] Sign up / log in with email + password and Google
-- [ ] Link Cognito subject to local User record; create Wallet on signup
-- [ ] User profile page (edit name, bio, photo)
-- [ ] Session handling on the web app
+- [x] Provision Cognito user pool + app client (CloudFormation: infra/cloudformation/cognito.yml)
+- [x] Configure AWS credentials and Secrets Manager (secret: swapify/cognito)
+- [x] Wire Cognito JWT verification into the API (jose + JWKS, client_id check)
+- [x] Sign up / log in with email + password (Cognito Hosted UI). Google deferred to Sprint 7
+- [x] Link Cognito subject to local User record; create Wallet on signup (auto on first login)
+- [x] User profile page (view: name, email, token balance). Edit (name/bio/photo) moved to future
+- [x] Session handling on the web app (Auth.js + NextAuth, protected /profile)
 
 ## Sprint 2 - Listings
 - [ ] Create a listing: photos, title, description, category, condition, value
@@ -75,6 +75,8 @@ Legend: [ ] not started · [x] done · [-] in progress
 - [ ] Feature flags and progressive rollout
 
 ## Future ideas (not yet scheduled)
+- Edit profile (name, bio, photo upload)
+- Google / social login (enable OAuth IdP in the user pool)
 - Shipping labels / carrier integration
 - Dispute resolution workflow
 - Mobile app (React Native)

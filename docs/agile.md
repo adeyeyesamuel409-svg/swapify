@@ -35,4 +35,5 @@ Track status inline in `docs/backlog.md`:
 - `[x]` done
 
 ## Current sprint
-Sprint 0 - Foundations (see backlog.md)
+Sprint 1 - Authentication (AWS Cognito) - done
+Next: Sprint 2 - Listings (see backlog.md)
