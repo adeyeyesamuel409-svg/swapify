@@ -22,10 +22,10 @@ Legend: [ ] not started · [x] done · [-] in progress
 - [x] Session handling on the web app (Auth.js + NextAuth, protected /profile)
 
 ## Sprint 2 - Listings
-- [ ] Create a listing: photos, title, description, category, condition, value
-- [ ] Browse listings (grid) and detail page
-- [ ] Search & filter by category / condition (basic)
-- [ ] Mark item active / hidden
+- [x] Create a listing: photos, title, description, category, condition, value
+- [x] Browse listings (grid) and detail page
+- [x] Search & filter by category / condition (basic)
+- [x] Mark item active / hidden
 - [ ] Upload photos to S3 via presigned URL (basic pipeline)
 
 ## Sprint 3 - Wallet & ledger
@@ -36,11 +36,12 @@ Legend: [ ] not started · [x] done · [-] in progress
 - [ ] Referral rewards (moved to future)
 
 ## Sprint 4 - Swap engine
-- [ ] Request a swap: offer one of my items for a listing
-- [ ] Value-difference calculation (offered vs requested)
-- [ ] Determine gap payer and required token amount
-- [ ] Accept / decline a swap request
-- [ ] Swap state machine (REQUESTED -> AGREED -> ...)
+- [x] Request a swap: offer one of my items for a listing
+- [x] Value-difference calculation (offered vs requested)
+- [x] Determine gap payer and required token amount
+- [x] Accept / decline a swap request
+- [x] Swap state machine (REQUESTED -> AGREED -> CANCELLED); items reserved while active
+- [ ] Gap tokens actually move when agreed (escrow - Sprint 5)
 
 ## Sprint 5 - Escrow
 - [ ] Hold gap tokens in escrow when swap is agreed

@@ -1,7 +1,10 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { fetchItem, itemValue } from "@/lib/api";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/auth";
+import { fetchItem, fetchMe, itemValue } from "@/lib/api";
 import { CATEGORY_LABELS, CONDITION_LABELS } from "@swapify/shared";
+import SwapRequestButton from "@/components/SwapRequestButton";
 
 export default async function ItemDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -12,6 +15,18 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
   } catch {
     notFound();
   }
+
+  // Show the swap button only when the viewer doesn't own this listing.
+  const session = await getServerSession(authOptions);
+  let viewerId: string | null = null;
+  if (session?.accessToken) {
+    try {
+      ({ user: { id: viewerId } } = await fetchMe(session.accessToken));
+    } catch {
+      viewerId = null;
+    }
+  }
+  const isOwnItem = item.owner.id === viewerId;
 
   const mainImage = item.images[0]?.url;
 
@@ -57,6 +72,8 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
           </div>
 
           <p className="mt-6 whitespace-pre-line text-gray-300">{item.description}</p>
+
+          {!isOwnItem && <SwapRequestButton itemId={item.id} itemValueTokens={itemValue(item)} />}
         </div>
       </div>
     </main>

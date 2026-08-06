@@ -46,3 +46,19 @@ export const CONDITION_LABELS: Record<(typeof CONDITIONS)[number], string> = {
   FAIR: 'Fair',
   POOR: 'Poor',
 };
+
+export const SWAP_STATUS_LABELS: Record<string, string> = {
+  REQUESTED: 'Requested',
+  AGREED: 'Agreed',
+  ESCROWED: 'Escrowed',
+  SHIPPED: 'Shipped',
+  COMPLETED: 'Completed',
+  CANCELLED: 'Cancelled',
+  EXPIRED: 'Expired',
+};
+
+export const GAP_PAYER_LABELS: Record<string, string> = {
+  OFFERING_USER: 'Offering user',
+  REQUESTING_USER: 'Requesting user',
+  NONE: 'No gap',
+};

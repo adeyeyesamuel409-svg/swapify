@@ -38,6 +38,8 @@ model User {
   items     Item[]
   wishlists Wishlist[]
   admin     Admin?
+  swapsOffered   Swap[]   @relation("OfferingUser")
+  swapsRequested Swap[]   @relation("RequestedUser")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -205,9 +207,11 @@ model Swap {
   offeringUserId String
   offeringItemId String
   offeringItem   Item       @relation("OfferedItem", fields: [offeringItemId], references: [id])
+  offeringUser   User       @relation("OfferingUser", fields: [offeringUserId], references: [id])
   requestedUserId String
   requestedItemId String
   requestedItem  Item       @relation("RequestedItem", fields: [requestedItemId], references: [id])
+  requestedUser  User       @relation("RequestedUser", fields: [requestedUserId], references: [id])
   // Value difference in micro-tokens (absolute value).
   gapMicroTokens BigInt     @default(0)
   gapPayer       GapPayer   @default(NONE)

@@ -115,3 +115,69 @@ export async function createItem(
 export function itemValue(item: ApiItem): number {
   return Number(BigInt(item.valueMicroTokens)) / 1_000_000;
 }
+
+export type ApiSwap = {
+  id: string;
+  status: string;
+  gapMicroTokens: string;
+  gapPayer: string;
+  offeringUserId: string;
+  requestedUserId: string;
+  createdAt: string;
+  updatedAt: string;
+  offeringItem: ApiItem;
+  requestedItem: ApiItem;
+  offeringUser: { id: string; name: string; imageUrl: string | null };
+  requestedUser: { id: string; name: string; imageUrl: string | null };
+};
+
+export function fetchSwaps(accessToken: string): Promise<{ swaps: ApiSwap[] }> {
+  return apiFetch("/swaps", accessToken);
+}
+
+async function apiSend(
+  path: string,
+  accessToken: string,
+  method: "POST" | "PATCH",
+  body?: unknown,
+): Promise<unknown> {
+  const res = await fetch(`${API_URL}${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      ...(body ? { "Content-Type": "application/json" } : {}),
+    },
+    body: body ? JSON.stringify(body) : undefined,
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.error ?? `API ${res.status}`);
+  }
+
+  return res.json();
+}
+
+export function createSwap(
+  accessToken: string,
+  input: { offeringItemId: string; requestedItemId: string },
+): Promise<{ swap: ApiSwap }> {
+  return apiSend("/swaps", accessToken, "POST", input) as Promise<{ swap: ApiSwap }>;
+}
+
+export function acceptSwap(accessToken: string, swapId: string): Promise<{ swap: ApiSwap }> {
+  return apiSend(`/swaps/${swapId}/accept`, accessToken, "POST") as Promise<{ swap: ApiSwap }>;
+}
+
+export function declineSwap(accessToken: string, swapId: string): Promise<{ swap: ApiSwap }> {
+  return apiSend(`/swaps/${swapId}/decline`, accessToken, "POST") as Promise<{ swap: ApiSwap }>;
+}
+
+export function cancelSwap(accessToken: string, swapId: string): Promise<{ swap: ApiSwap }> {
+  return apiSend(`/swaps/${swapId}/cancel`, accessToken, "POST") as Promise<{ swap: ApiSwap }>;
+}
+
+export function fetchMyItems(accessToken: string): Promise<ListItemsResult> {
+  return apiFetch("/items/me", accessToken);
+}

@@ -114,6 +114,18 @@ const itemsRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
     return { items, total, page, pageSize };
   });
 
+  app.get('/items/me', { preHandler: [app.authenticate] }, async (request) => {
+    const user = request.user!;
+
+    const items = await prisma.item.findMany({
+      where: { ownerId: user.id, status: { not: ItemStatus.DELETED } },
+      include: itemInclude,
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return { items, total: items.length, page: 1, pageSize: items.length };
+  });
+
   app.get('/items/:id', { schema: itemParamsSchema }, async (request, reply) => {
     const { id } = request.params as { id: string };
 
