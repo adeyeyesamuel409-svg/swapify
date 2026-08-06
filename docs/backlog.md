@@ -29,10 +29,11 @@ Legend: [ ] not started · [x] done · [-] in progress
 - [ ] Upload photos to S3 via presigned URL (basic pipeline)
 
 ## Sprint 3 - Wallet & ledger
-- [ ] View wallet balance and transaction history
-- [ ] Earn tokens (welcome bonus, referral)
-- [ ] Immutable ledger with idempotency keys
-- [ ] Concurrency-safe balance updates (optimistic locking)
+- [x] View wallet balance and transaction history (GET /wallet + /wallet page)
+- [x] Earn tokens (10-token welcome bonus on first signup, idempotent)
+- [x] Immutable append-only ledger with idempotency keys
+- [x] Concurrency-safe balance updates (atomic ops + SERIALIZABLE tx + retry)
+- [ ] Referral rewards (moved to future)
 
 ## Sprint 4 - Swap engine
 - [ ] Request a swap: offer one of my items for a listing
@@ -75,6 +76,7 @@ Legend: [ ] not started · [x] done · [-] in progress
 - [ ] Feature flags and progressive rollout
 
 ## Future ideas (not yet scheduled)
+- Referral rewards (track referrer + credit tokens)
 - Edit profile (name, bio, photo upload)
 - Google / social login (enable OAuth IdP in the user pool)
 - Shipping labels / carrier integration

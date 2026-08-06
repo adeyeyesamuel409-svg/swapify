@@ -1,7 +1,12 @@
 import fp from 'fastify-plugin';
 import { FastifyInstance, FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import { createRemoteJWKSet, jwtVerify, JWTPayload } from 'jose';
-import { prisma, User, Wallet } from '@swapify/db';
+import { prisma, TransactionDirection, TransactionType, User, Wallet } from '@swapify/db';
+import {
+  applyLedgerEntry,
+  MICRO_TOKENS_PER_TOKEN,
+  WELCOME_BONUS_TOKENS,
+} from '../services/ledger.js';
 
 export interface AuthenticatedUser extends User {
   wallet: Wallet | null;
@@ -48,14 +53,29 @@ async function syncUserFromCognito(payload: JWTPayload): Promise<AuthenticatedUs
     });
   }
 
-  // No local record yet - create user + empty wallet in one transaction.
-  return prisma.user.create({
+  // No local record yet - create user + wallet, then grant the welcome bonus.
+  // The idempotency key guarantees the bonus is only ever granted once.
+  const created = await prisma.user.create({
     data: {
       cognitoSub: sub,
       email: email ?? `${sub}@cognito.invalid`,
       name,
       wallet: { create: {} },
     },
+    include: { wallet: true },
+  });
+
+  await applyLedgerEntry({
+    walletId: created.wallet!.id,
+    type: TransactionType.EARN,
+    direction: TransactionDirection.CREDIT,
+    amountMicroTokens: WELCOME_BONUS_TOKENS * MICRO_TOKENS_PER_TOKEN,
+    note: 'Welcome bonus',
+    idempotencyKey: `welcome:${sub}`,
+  });
+
+  return prisma.user.findUniqueOrThrow({
+    where: { id: created.id },
     include: { wallet: true },
   });
 }

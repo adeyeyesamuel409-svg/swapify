@@ -26,11 +26,21 @@ export default async function ProfilePage() {
       </div>
 
       <div className="rounded-xl border border-indigo-500/30 bg-indigo-950 p-6">
-        <p className="text-sm font-medium text-indigo-300">Token balance</p>
-        <p className="mt-1 text-3xl font-bold text-white">{tokens.toLocaleString()} tokens</p>
-        <p className="mt-1 text-xs text-indigo-400">
-          Earned by swapping, or bought later. Used to balance value gaps.
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-indigo-300">Token balance</p>
+            <p className="mt-1 text-3xl font-bold text-white">{tokens.toLocaleString()} tokens</p>
+            <p className="mt-1 text-xs text-indigo-400">
+              Earned by swapping, or bought later. Used to balance value gaps.
+            </p>
+          </div>
+          <a
+            href="/wallet"
+            className="rounded-md border border-indigo-500 px-4 py-2 text-sm font-semibold text-indigo-200 hover:bg-indigo-900"
+          >
+            View history
+          </a>
+        </div>
       </div>
     </main>
   );

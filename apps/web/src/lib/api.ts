@@ -42,6 +42,30 @@ export async function apiFetch<T>(path: string, accessToken?: string): Promise<T
   return res.json() as Promise<T>;
 }
 
+export type ApiWallet = {
+  id: string;
+  balanceMicroTokens: string;
+  version: number;
+  createdAt: string;
+};
+
+export type ApiTransaction = {
+  id: string;
+  type: string;
+  direction: string;
+  amountMicroTokens: string;
+  balanceAfterMicroTokens: string;
+  referenceId: string | null;
+  note: string | null;
+  createdAt: string;
+};
+
+export type WalletResult = { wallet: ApiWallet; transactions: ApiTransaction[] };
+
+export function fetchWallet(accessToken: string): Promise<WalletResult> {
+  return apiFetch("/wallet", accessToken);
+}
+
 export function fetchMe(accessToken: string): Promise<{ user: ApiUser }> {
   return apiFetch("/auth/me", accessToken);
 }

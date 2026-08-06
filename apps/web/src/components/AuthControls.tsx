@@ -12,8 +12,14 @@ export default function AuthControls() {
           Signed in as <span className="font-semibold text-white">{session.user.email}</span>
         </p>
         <a
-          href="/profile"
+          href="/wallet"
           className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500"
+        >
+          My wallet
+        </a>
+        <a
+          href="/profile"
+          className="rounded-md border border-gray-600 px-4 py-2 text-sm font-semibold text-gray-200 hover:bg-gray-700"
         >
           My profile
         </a>
