@@ -1,0 +1,12 @@
+# Normalize line endings to LF for everything in the repo.
+# Windows editors still open files fine; Git just stores/checks out consistently.
+* text=auto eol=lf
+
+# Files that must never be treated as text.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.pdf binary
