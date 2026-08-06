@@ -44,10 +44,11 @@ Legend: [ ] not started · [x] done · [-] in progress
 - [ ] Gap tokens actually move when agreed (escrow - Sprint 5)
 
 ## Sprint 5 - Escrow
-- [ ] Hold gap tokens in escrow when swap is agreed
-- [ ] Confirm receipt flow for both parties
-- [ ] Release escrow on completion; refund on cancel
-- [ ] Escrow timeout / expiry handling
+- [x] Hold gap tokens in escrow when swap is agreed (payer funds; ledger debited)
+- [x] Confirm receipt flow for both parties (completes when both confirm)
+- [x] Release escrow on completion; refund on cancel
+- [x] Escrow timeout / expiry handling (auto-sweep + manual expire)
+- [x] Ownership transfers to the new owner on completion
 
 ## Sprint 6 - Buy tokens (Stripe)
 - [ ] Token price tiers (Stripe Checkout)

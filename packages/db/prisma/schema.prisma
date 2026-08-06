@@ -221,6 +221,10 @@ model Swap {
   trackingNumber String?
   carrier        String?
 
+  // Each party confirms they received the other item; swap completes when both have.
+  offeringUserConfirmedAt DateTime?
+  requestedUserConfirmedAt DateTime?
+
   messages       Message[]
   ratings        Rating[]
 

@@ -1,11 +1,15 @@
 import 'dotenv/config';
 import { FastifyInstance } from 'fastify';
 import { buildApp } from './app.js';
+import { startEscrowSweeper } from './services/escrow.js';
 
 const port = Number(process.env.PORT ?? 4000);
 const host = process.env.HOST ?? '0.0.0.0';
 
 const app: FastifyInstance = await buildApp();
+
+// Periodically refund escrow for swaps that never completed in time.
+startEscrowSweeper();
 
 try {
   await app.listen({ port, host });

@@ -123,12 +123,24 @@ export type ApiSwap = {
   gapPayer: string;
   offeringUserId: string;
   requestedUserId: string;
+  offeringUserConfirmedAt: string | null;
+  requestedUserConfirmedAt: string | null;
+  expiresAt: string | null;
   createdAt: string;
   updatedAt: string;
   offeringItem: ApiItem;
   requestedItem: ApiItem;
   offeringUser: { id: string; name: string; imageUrl: string | null };
   requestedUser: { id: string; name: string; imageUrl: string | null };
+  escrow: {
+    id: string;
+    status: string;
+    amountMicroTokens: string;
+    walletId: string;
+    heldAt: string;
+    releasedAt: string | null;
+    refundedAt: string | null;
+  } | null;
 };
 
 export function fetchSwaps(accessToken: string): Promise<{ swaps: ApiSwap[] }> {
@@ -176,6 +188,14 @@ export function declineSwap(accessToken: string, swapId: string): Promise<{ swap
 
 export function cancelSwap(accessToken: string, swapId: string): Promise<{ swap: ApiSwap }> {
   return apiSend(`/swaps/${swapId}/cancel`, accessToken, "POST") as Promise<{ swap: ApiSwap }>;
+}
+
+export function fundSwap(accessToken: string, swapId: string): Promise<{ swap: ApiSwap }> {
+  return apiSend(`/swaps/${swapId}/fund`, accessToken, "POST") as Promise<{ swap: ApiSwap }>;
+}
+
+export function confirmSwap(accessToken: string, swapId: string): Promise<{ swap: ApiSwap }> {
+  return apiSend(`/swaps/${swapId}/confirm`, accessToken, "POST") as Promise<{ swap: ApiSwap }>;
 }
 
 export function fetchMyItems(accessToken: string): Promise<ListItemsResult> {

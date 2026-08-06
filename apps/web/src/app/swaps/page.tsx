@@ -14,10 +14,20 @@ function SwapCard({ swap, accessToken, myUserId }: { swap: ApiSwap; accessToken:
   const statusColor: Record<string, string> = {
     REQUESTED: "text-amber-300 border-amber-500/40 bg-amber-950",
     AGREED: "text-sky-300 border-sky-500/40 bg-sky-950",
+    ESCROWED: "text-emerald-300 border-emerald-500/40 bg-emerald-950",
     COMPLETED: "text-emerald-300 border-emerald-500/40 bg-emerald-950",
     CANCELLED: "text-gray-400 border-gray-600 bg-gray-800",
     EXPIRED: "text-gray-400 border-gray-600 bg-gray-800",
   };
+
+  const escrowLabel =
+    swap.escrow?.status === "HELD"
+      ? `Tokens held in escrow: ${Number(BigInt(swap.escrow.amountMicroTokens)) / 1_000_000}`
+      : swap.escrow?.status === "RELEASED"
+        ? "Escrow released"
+        : swap.escrow?.status === "REFUNDED"
+          ? "Escrow refunded"
+          : null;
 
   return (
     <div className="rounded-xl border border-gray-700 bg-gray-800 p-5">
@@ -53,6 +63,12 @@ function SwapCard({ swap, accessToken, myUserId }: { swap: ApiSwap; accessToken:
             : swap.gapPayer === "REQUESTING_USER"
               ? "you"
               : swap.offeringUser.name}
+        </p>
+      )}
+
+      {escrowLabel && (
+        <p className="mt-2 inline-block rounded bg-emerald-950 px-2 py-0.5 text-xs font-semibold text-emerald-300">
+          {escrowLabel}
         </p>
       )}
 
