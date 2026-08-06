@@ -62,3 +62,27 @@ export const GAP_PAYER_LABELS: Record<string, string> = {
   REQUESTING_USER: 'Requesting user',
   NONE: 'No gap',
 };
+
+// Token purchase tiers. The API is the authority on pricing; this list only
+// drives what the UI shows and what tierId values are valid.
+export const TOKEN_TIERS = [
+  { id: 'starter', tokens: 50, priceCents: 500 },
+  { id: 'regular', tokens: 150, priceCents: 1400 },
+  { id: 'booster', tokens: 500, priceCents: 4000 },
+  { id: 'power', tokens: 1200, priceCents: 8500 },
+] as const;
+
+export type TokenTier = (typeof TOKEN_TIERS)[number];
+
+export const TOKEN_TIER_LABELS: Record<string, string> = {
+  starter: 'Starter',
+  regular: 'Regular',
+  booster: 'Booster',
+  power: 'Power',
+};
+
+export const TOKEN_ORDER_STATUS_LABELS: Record<string, string> = {
+  PENDING: 'Pending',
+  PAID: 'Paid',
+  FAILED: 'Failed',
+};

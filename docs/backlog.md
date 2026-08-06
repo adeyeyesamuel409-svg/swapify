@@ -51,9 +51,10 @@ Legend: [ ] not started · [x] done · [-] in progress
 - [x] Ownership transfers to the new owner on completion
 
 ## Sprint 6 - Buy tokens (Stripe)
-- [ ] Token price tiers (Stripe Checkout)
-- [ ] Stripe webhook -> credit wallet (idempotent)
-- [ ] Order history in the UI
+- [x] Token price tiers (Stripe Checkout)
+- [x] Stripe webhook -> credit wallet (idempotent)
+- [x] Order history in the UI
+- [ ] Real Stripe live keys + webhook endpoint (dev simulation works without keys)
 
 ## Sprint 7 - Marketplace
 - [ ] Chat on a swap (replaces external messaging)

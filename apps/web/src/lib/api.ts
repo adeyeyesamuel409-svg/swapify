@@ -201,3 +201,36 @@ export function confirmSwap(accessToken: string, swapId: string): Promise<{ swap
 export function fetchMyItems(accessToken: string): Promise<ListItemsResult> {
   return apiFetch("/items/me", accessToken);
 }
+
+export type ApiTokenOrder = {
+  id: string;
+  tierId: string;
+  tokens: string;
+  priceCents: number;
+  status: string;
+  createdAt: string;
+  paidAt: string | null;
+};
+
+export function fetchTokenOrders(accessToken: string): Promise<{ orders: ApiTokenOrder[] }> {
+  return apiFetch("/token-orders", accessToken);
+}
+
+export async function createCheckoutSession(
+  accessToken: string,
+  input: { tierId: string; successUrl: string; cancelUrl: string },
+): Promise<{ url: string; simulated: boolean; order: ApiTokenOrder }> {
+  const res = await fetch(`${API_URL}/token-orders/checkout`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.error ?? `API ${res.status}`);
+  }
+
+  return res.json();
+}

@@ -40,6 +40,7 @@ model User {
   admin     Admin?
   swapsOffered   Swap[]   @relation("OfferingUser")
   swapsRequested Swap[]   @relation("RequestedUser")
+  tokenOrders     TokenOrder[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -258,6 +259,38 @@ model EscrowHold {
   heldAt     DateTime @default(now())
   releasedAt DateTime?
   refundedAt DateTime?
+}
+
+// ---------------------------------------------------------------------------
+// Token purchases (Stripe)
+// ---------------------------------------------------------------------------
+
+enum TokenOrderStatus {
+  PENDING
+  PAID
+  FAILED
+}
+
+/// A purchase of tokens with real money. stripeCheckoutSessionId is unique so
+/// the Stripe webhook can never credit the same order twice.
+model TokenOrder {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  // Which tier was bought (see shared: TOKEN_TIERS).
+  tierId      String
+  tokens      BigInt
+  // Price charged to the buyer, in minor units (USD cents).
+  priceCents  Int
+  currency    String   @default("usd")
+  status      TokenOrderStatus @default(PENDING)
+  stripeCheckoutSessionId String? @unique
+  stripePaymentIntentId String?
+
+  createdAt DateTime @default(now())
+  paidAt    DateTime?
+
+  @@index([userId, createdAt(sort: Desc)])
 }
 
 // ---------------------------------------------------------------------------
