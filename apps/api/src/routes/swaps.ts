@@ -3,6 +3,7 @@ import { ItemStatus, Prisma, Swap, SwapStatus, prisma } from '@swapify/db';
 import { HttpError, assertNoActiveSwap, computeGap, withSerializableRetry } from '../services/swaps.js';
 import { InsufficientFundsError } from '../services/ledger.js';
 import { fundEscrow, gapPayerUserId, refundEscrow, releaseEscrow } from '../services/escrow.js';
+import { notify } from '../services/notifications.js';
 
 const swapParamsSchema = {
   params: {
@@ -155,6 +156,12 @@ const swapRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
       return swap;
     });
 
+    await notify(
+      swap.requestedUserId,
+      'SWAP_REQUEST',
+      `${user.name} wants to swap their ${swap.offeringItem.title} for your listing`,
+      swap.id,
+    );
     return { swap };
   });
 
@@ -182,6 +189,7 @@ const swapRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
       });
     });
 
+    await notify(swap.offeringUserId, 'SWAP_UPDATE', `${user.name} accepted your swap request`, swap.id);
     return { swap };
   });
 
@@ -209,6 +217,7 @@ const swapRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
       return updated;
     });
 
+    await notify(swap.offeringUserId, 'SWAP_UPDATE', `${user.name} declined your swap request`, swap.id);
     return { swap };
   });
 
@@ -244,6 +253,9 @@ const swapRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
       data: { status: SwapStatus.ESCROWED },
       include: swapInclude,
     });
+
+    const otherParty = updated.offeringUserId === user.id ? updated.requestedUserId : updated.offeringUserId;
+    await notify(otherParty, 'ESCROW', `${user.name} funded the escrow for your swap`, updated.id);
 
     return { swap: updated, escrow };
   });
@@ -304,6 +316,13 @@ const swapRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
         data: { status: SwapStatus.COMPLETED, completedAt: now },
         include: swapInclude,
       });
+
+      const otherParty = amOffering ? updated.requestedUserId : updated.offeringUserId;
+      await notify(otherParty, 'SWAP_UPDATE', 'Swap completed - rate the other party', updated.id);
+      await notify(updated.offeringUserId, 'SWAP_UPDATE', 'Swap completed - rate the other party', updated.id);
+    } else {
+      const otherParty = amOffering ? updated.requestedUserId : updated.offeringUserId;
+      await notify(otherParty, 'SWAP_UPDATE', `${user.name} confirmed they received your item`, updated.id);
     }
 
     return { swap: updated };
@@ -327,6 +346,8 @@ const swapRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
         await releaseItems(tx, [swap.offeringItemId, swap.requestedItemId]);
         return released;
       });
+      const otherParty = updated.offeringUserId === user.id ? updated.requestedUserId : updated.offeringUserId;
+      await notify(otherParty, 'SWAP_UPDATE', `${user.name} cancelled the swap`, updated.id);
       return { swap: updated };
     }
 
@@ -335,6 +356,8 @@ const swapRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
         throw new HttpError(409, 'Swap is already in motion; it cannot be cancelled');
       }
       const updated = await settleCancelledSwap(swap, SwapStatus.CANCELLED);
+      const otherParty = updated.offeringUserId === user.id ? updated.requestedUserId : updated.offeringUserId;
+      await notify(otherParty, 'SWAP_UPDATE', `${user.name} cancelled the swap`, updated.id);
       return { swap: updated };
     }
 

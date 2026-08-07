@@ -1,7 +1,7 @@
 import fp from 'fastify-plugin';
 import { FastifyInstance, FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import { createRemoteJWKSet, jwtVerify, JWTPayload } from 'jose';
-import { prisma, TransactionDirection, TransactionType, User, Wallet } from '@swapify/db';
+import { prisma, Admin, TransactionDirection, TransactionType, User, Wallet } from '@swapify/db';
 import {
   applyLedgerEntry,
   MICRO_TOKENS_PER_TOKEN,
@@ -10,6 +10,7 @@ import {
 
 export interface AuthenticatedUser extends User {
   wallet: Wallet | null;
+  admin: Admin | null;
 }
 
 declare module 'fastify' {
@@ -49,7 +50,7 @@ async function syncUserFromCognito(payload: JWTPayload): Promise<AuthenticatedUs
         ...(email && email !== existing.email ? { email } : {}),
         name,
       },
-      include: { wallet: true },
+      include: { wallet: true, admin: true },
     });
   }
 
@@ -76,7 +77,7 @@ async function syncUserFromCognito(payload: JWTPayload): Promise<AuthenticatedUs
 
   return prisma.user.findUniqueOrThrow({
     where: { id: created.id },
-    include: { wallet: true },
+    include: { wallet: true, admin: true },
   });
 }
 

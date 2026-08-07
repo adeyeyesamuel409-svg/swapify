@@ -57,11 +57,12 @@ Legend: [ ] not started · [x] done · [-] in progress
 - [ ] Real Stripe live keys + webhook endpoint (dev simulation works without keys)
 
 ## Sprint 7 - Marketplace
-- [ ] Chat on a swap (replaces external messaging)
-- [ ] Ratings & reviews after completed swap
-- [ ] Wishlists: list items I need; match against listings
-- [ ] Notifications (email + in-app)
-- [ ] Admin dashboard: users, listings, disputes
+- [x] Chat on a swap (replaces external messaging)
+- [x] Ratings & reviews after completed swap
+- [x] Wishlists: list items I need; match against listings
+- [x] Notifications (in-app; email deferred)
+- [x] Admin dashboard: users, listings, disputes (users + listings + token credit; disputes deferred)
+- [ ] Email notifications (SES)
 
 ## Sprint 8 - Deploy to AWS
 - [ ] Dockerfiles for API and web

@@ -86,3 +86,20 @@ export const TOKEN_ORDER_STATUS_LABELS: Record<string, string> = {
   PAID: 'Paid',
   FAILED: 'Failed',
 };
+
+export const NOTIFICATION_TYPE_LABELS: Record<string, string> = {
+  SWAP_REQUEST: 'Swap request',
+  SWAP_UPDATE: 'Swap update',
+  MESSAGE: 'Message',
+  RATING: 'Rating',
+  ESCROW: 'Escrow',
+  SYSTEM: 'System',
+};
+
+export const ITEM_STATUS_LABELS: Record<string, string> = {
+  ACTIVE: 'Active',
+  RESERVED: 'Reserved',
+  SWAPPED: 'Swapped',
+  HIDDEN: 'Hidden',
+  DELETED: 'Deleted',
+};

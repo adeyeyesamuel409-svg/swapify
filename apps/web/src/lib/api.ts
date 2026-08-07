@@ -7,6 +7,7 @@ export type ApiUser = {
   bio: string | null;
   imageUrl: string | null;
   wallet: { balanceMicroTokens: string } | null;
+  admin: { role: string } | null;
 };
 
 export type ApiItem = {
@@ -147,10 +148,14 @@ export function fetchSwaps(accessToken: string): Promise<{ swaps: ApiSwap[] }> {
   return apiFetch("/swaps", accessToken);
 }
 
+export function fetchSwap(accessToken: string, id: string): Promise<{ swap: ApiSwap }> {
+  return apiFetch(`/swaps/${id}`, accessToken);
+}
+
 async function apiSend(
   path: string,
   accessToken: string,
-  method: "POST" | "PATCH",
+  method: "POST" | "PATCH" | "DELETE",
   body?: unknown,
 ): Promise<unknown> {
   const res = await fetch(`${API_URL}${path}`, {
@@ -196,6 +201,166 @@ export function fundSwap(accessToken: string, swapId: string): Promise<{ swap: A
 
 export function confirmSwap(accessToken: string, swapId: string): Promise<{ swap: ApiSwap }> {
   return apiSend(`/swaps/${swapId}/confirm`, accessToken, "POST") as Promise<{ swap: ApiSwap }>;
+}
+
+// --- Chat ---------------------------------------------------------------
+
+export type ApiMessage = {
+  id: string;
+  swapId: string;
+  senderId: string;
+  body: string;
+  createdAt: string;
+  sender: { id: string; name: string; imageUrl: string | null };
+};
+
+export function fetchMessages(accessToken: string, swapId: string): Promise<{ messages: ApiMessage[] }> {
+  return apiFetch(`/swaps/${swapId}/messages`, accessToken);
+}
+
+export function sendMessage(
+  accessToken: string,
+  swapId: string,
+  body: string,
+): Promise<{ message: ApiMessage }> {
+  return apiSend(`/swaps/${swapId}/messages`, accessToken, "POST", { body }) as Promise<{ message: ApiMessage }>;
+}
+
+// --- Ratings ------------------------------------------------------------
+
+export type ApiRating = {
+  id: string;
+  swapId: string;
+  raterId: string;
+  rateeId: string;
+  score: number;
+  comment: string | null;
+  createdAt: string;
+  rater: { id: string; name: string; imageUrl: string | null };
+};
+
+export function rateSwap(
+  accessToken: string,
+  swapId: string,
+  input: { score: number; comment?: string },
+): Promise<{ rating: ApiRating }> {
+  return apiSend(`/swaps/${swapId}/rating`, accessToken, "POST", input) as Promise<{ rating: ApiRating }>;
+}
+
+export function fetchUserRatings(userId: string): Promise<{ ratings: ApiRating[]; averageScore: number | null; total: number }> {
+  return apiFetch(`/users/${userId}/ratings`);
+}
+
+export function fetchSwapRatings(accessToken: string, swapId: string): Promise<{ ratings: ApiRating[] }> {
+  return apiFetch(`/swaps/${swapId}/ratings`, accessToken);
+}
+
+// --- Wishlists ----------------------------------------------------------
+
+export type ApiWishlist = {
+  id: string;
+  title: string;
+  description: string | null;
+  category: string | null;
+  maxValueMicroTokens: string | null;
+  createdAt: string;
+};
+
+export function fetchWishlists(accessToken: string): Promise<{ wishlists: ApiWishlist[] }> {
+  return apiFetch("/wishlists", accessToken);
+}
+
+export function createWishlist(
+  accessToken: string,
+  input: { title: string; description?: string; category?: string; maxValueTokens?: number },
+): Promise<{ wishlist: ApiWishlist }> {
+  return apiSend("/wishlists", accessToken, "POST", input) as Promise<{ wishlist: ApiWishlist }>;
+}
+
+export function deleteWishlist(accessToken: string, id: string): Promise<unknown> {
+  return apiSend(`/wishlists/${id}`, accessToken, "DELETE") as Promise<unknown>;
+}
+
+export function fetchWishlistMatches(
+  accessToken: string,
+  id: string,
+): Promise<{ matches: ApiItem[] }> {
+  return apiFetch(`/wishlists/${id}/matches`, accessToken);
+}
+
+// --- Notifications ------------------------------------------------------
+
+export type ApiNotification = {
+  id: string;
+  type: string;
+  body: string;
+  read: boolean;
+  referenceId: string | null;
+  createdAt: string;
+};
+
+export function fetchNotifications(accessToken: string): Promise<{ notifications: ApiNotification[] }> {
+  return apiFetch("/notifications", accessToken);
+}
+
+export function fetchUnreadCount(accessToken: string): Promise<{ count: number }> {
+  return apiFetch("/notifications/unread-count", accessToken);
+}
+
+export function markNotificationRead(accessToken: string, id: string): Promise<{ notification: ApiNotification }> {
+  return apiSend(`/notifications/${id}/read`, accessToken, "POST") as Promise<{ notification: ApiNotification }>;
+}
+
+export function markAllNotificationsRead(accessToken: string): Promise<{ updated: number }> {
+  return apiSend("/notifications/read-all", accessToken, "POST") as Promise<{ updated: number }>;
+}
+
+// --- Admin --------------------------------------------------------------
+
+export type AdminStats = {
+  users: number;
+  items: number;
+  swaps: number;
+  activeSwaps: number;
+  escrowedMicroTokens: string;
+};
+
+export type AdminUser = {
+  id: string;
+  name: string;
+  email: string;
+  createdAt: string;
+  admin: { role: string } | null;
+  wallet: { balanceMicroTokens: string } | null;
+  _count: { items: number; swapsOffered: number; swapsRequested: number };
+};
+
+export function fetchAdminStats(accessToken: string): Promise<{ stats: AdminStats }> {
+  return apiFetch("/admin/stats", accessToken);
+}
+
+export function fetchAdminUsers(accessToken: string): Promise<{ users: AdminUser[] }> {
+  return apiFetch("/admin/users", accessToken);
+}
+
+export function fetchAdminListings(accessToken: string): Promise<{ items: ApiItem[] }> {
+  return apiFetch("/admin/listings", accessToken);
+}
+
+export function setItemStatus(
+  accessToken: string,
+  itemId: string,
+  status: string,
+): Promise<{ item: ApiItem }> {
+  return apiSend(`/admin/items/${itemId}/status`, accessToken, "POST", { status }) as Promise<{ item: ApiItem }>;
+}
+
+export function creditUserTokens(
+  accessToken: string,
+  userId: string,
+  input: { tokens: number; note?: string },
+): Promise<unknown> {
+  return apiSend(`/admin/users/${userId}/credit`, accessToken, "POST", input);
 }
 
 export function fetchMyItems(accessToken: string): Promise<ListItemsResult> {

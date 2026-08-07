@@ -41,6 +41,10 @@ model User {
   swapsOffered   Swap[]   @relation("OfferingUser")
   swapsRequested Swap[]   @relation("RequestedUser")
   tokenOrders     TokenOrder[]
+  messagesSent    Message[] @relation("MessageSender")
+  ratingsGiven    Rating[]  @relation("Rater")
+  ratingsReceived Rating[]  @relation("Ratee")
+  notifications   Notification[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -302,6 +306,7 @@ model Message {
   swapId   String
   swap     Swap   @relation(fields: [swapId], references: [id], onDelete: Cascade)
   senderId String
+  sender   User   @relation("MessageSender", fields: [senderId], references: [id])
   body     String
 
   createdAt DateTime @default(now())
@@ -314,7 +319,9 @@ model Rating {
   swapId  String
   swap    Swap   @relation(fields: [swapId], references: [id], onDelete: Cascade)
   raterId String
+  rater   User   @relation("Rater", fields: [raterId], references: [id])
   rateeId String
+  ratee   User   @relation("Ratee", fields: [rateeId], references: [id])
   // 1-5 stars
   score   Int
   comment String?
@@ -331,6 +338,8 @@ model Wishlist {
   user        User   @relation(fields: [userId], references: [id])
   title       String
   description String?
+  // Optional category hint used when matching against active listings.
+  category    Category?
   // Optional ceiling for what the user is willing to spend on the gap.
   maxValueMicroTokens BigInt?
 
@@ -351,6 +360,7 @@ enum NotificationType {
 model Notification {
   id     String           @id @default(cuid())
   userId String
+  user   User             @relation(fields: [userId], references: [id])
   type   NotificationType
   body   String
   read   Boolean          @default(false)

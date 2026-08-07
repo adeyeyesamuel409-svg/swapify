@@ -1,5 +1,6 @@
 import Fastify, { FastifyError, FastifyInstance } from 'fastify';
 import rawBody from 'fastify-raw-body';
+import cors from '@fastify/cors';
 import { jsonWithBigInt } from '@swapify/db';
 import { healthRoutes } from './routes/health.js';
 import { authRoutes } from './routes/auth.js';
@@ -8,6 +9,11 @@ import { walletRoutes } from './routes/wallet.js';
 import { swapRoutes } from './routes/swaps.js';
 import { tokenOrderRoutes } from './routes/token-orders.js';
 import { stripeRoutes } from './routes/stripe.js';
+import { chatRoutes } from './routes/chat.js';
+import { ratingRoutes } from './routes/ratings.js';
+import { wishlistRoutes } from './routes/wishlists.js';
+import { notificationRoutes } from './routes/notifications.js';
+import { adminRoutes } from './routes/admin.js';
 import { HttpError } from './services/swaps.js';
 import authPlugin from './plugins/auth.js';
 
@@ -24,6 +30,15 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   // Stripe webhook signature verification needs the raw request body.
   app.register(rawBody);
+
+  // The web app runs on a different origin (localhost:3000) than the API
+  // (localhost:4000), and authenticated calls send an Authorization header,
+  // which triggers CORS preflights. Allow the configured web origin.
+  const webOrigin = process.env.WEB_BASE_URL ?? 'http://localhost:3000';
+  await app.register(cors, {
+    origin: [webOrigin, 'http://localhost:3000'],
+    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+  });
 
   // Expected business errors (bad input, conflicts, missing resources) get
   // their proper status code; everything else is a logged 500.
@@ -50,6 +65,11 @@ export async function buildApp(): Promise<FastifyInstance> {
   app.register(swapRoutes);
   app.register(tokenOrderRoutes);
   app.register(stripeRoutes);
+  app.register(chatRoutes);
+  app.register(ratingRoutes);
+  app.register(wishlistRoutes);
+  app.register(notificationRoutes);
+  app.register(adminRoutes);
 
   return app;
 }

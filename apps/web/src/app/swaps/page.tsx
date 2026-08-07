@@ -43,12 +43,16 @@ function SwapCard({ swap, accessToken, myUserId }: { swap: ApiSwap; accessToken:
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <div className="rounded-lg border border-gray-700 bg-gray-900 p-3">
           <p className="text-xs text-gray-500">{amOffering ? "You offer" : `${swap.offeringUser.name} offers`}</p>
-          <p className="mt-1 truncate font-semibold text-white">{swap.offeringItem.title}</p>
+          <Link href={`/items/${swap.offeringItem.id}`} className="mt-1 block truncate font-semibold text-indigo-300 hover:underline">
+            {swap.offeringItem.title}
+          </Link>
           <p className="text-xs text-indigo-300">{itemValue(swap.offeringItem)} tokens</p>
         </div>
         <div className="rounded-lg border border-gray-700 bg-gray-900 p-3">
           <p className="text-xs text-gray-500">{amOffering ? `${swap.requestedUser.name} offers` : "You receive"}</p>
-          <p className="mt-1 truncate font-semibold text-white">{swap.requestedItem.title}</p>
+          <Link href={`/items/${swap.requestedItem.id}`} className="mt-1 block truncate font-semibold text-indigo-300 hover:underline">
+            {swap.requestedItem.title}
+          </Link>
           <p className="text-xs text-indigo-300">{itemValue(swap.requestedItem)} tokens</p>
         </div>
       </div>
@@ -73,6 +77,17 @@ function SwapCard({ swap, accessToken, myUserId }: { swap: ApiSwap; accessToken:
       )}
 
       <SwapActions swap={swap} accessToken={accessToken} myUserId={myUserId} />
+
+      <div className="mt-3 flex items-center gap-4 text-xs">
+        <Link href={`/swaps/${swap.id}`} className="font-semibold text-indigo-400 hover:underline">
+          View details &amp; chat
+        </Link>
+        {swap.status === "COMPLETED" && (
+          <Link href={`/swaps/${swap.id}`} className="text-gray-400 hover:text-gray-200">
+            Rate this swap
+          </Link>
+        )}
+      </div>
     </div>
   );
 }
