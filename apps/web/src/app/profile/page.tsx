@@ -18,42 +18,42 @@ export default async function ProfilePage() {
   const tokens = user.wallet ? Number(user.wallet.balanceMicroTokens) / 1_000_000 : 0;
 
   return (
-    <main className="mx-auto flex max-w-2xl flex-1 flex-col gap-6 px-6 py-12">
-      <h1 className="text-3xl font-bold text-white">My profile</h1>
+    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 py-12 sm:px-6">
+      <h1 className="text-3xl font-bold tracking-tight text-foreground">My profile</h1>
 
-      <div className="rounded-xl border border-gray-700 bg-gray-800 p-6">
+      <div className="rounded-card border border-line bg-surface p-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-lg font-semibold text-white">{user.name}</p>
-            <p className="text-sm text-gray-300">{user.email}</p>
+            <p className="text-lg font-semibold text-foreground">{user.name}</p>
+            <p className="text-sm text-muted">{user.email}</p>
           </div>
           {ratings && ratings.total > 0 && (
             <div className="text-right">
-              <p className="text-2xl font-bold text-amber-400">
+              <p className="text-2xl font-bold text-token">
                 {"★".repeat(Math.round(ratings.averageScore ?? 0))}
-                <span className="text-gray-600">{"★".repeat(5 - Math.round(ratings.averageScore ?? 0))}</span>
+                <span className="text-line-strong">{"★".repeat(5 - Math.round(ratings.averageScore ?? 0))}</span>
               </p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted">
                 {ratings.averageScore?.toFixed(1)} · {ratings.total} rating{ratings.total === 1 ? "" : "s"}
               </p>
             </div>
           )}
         </div>
-        {user.bio && <p className="mt-2 text-sm text-gray-400">{user.bio}</p>}
+        {user.bio && <p className="mt-2 text-sm text-muted">{user.bio}</p>}
       </div>
 
-      <div className="rounded-xl border border-indigo-500/30 bg-indigo-950 p-6">
+      <div className="rounded-card border border-token/30 bg-token/10 p-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium text-indigo-300">Token balance</p>
-            <p className="mt-1 text-3xl font-bold text-white">{tokens.toLocaleString()} tokens</p>
-            <p className="mt-1 text-xs text-indigo-400">
-              Earned by swapping, or bought later. Used to balance value gaps.
+            <p className="text-sm font-medium text-token">Token balance</p>
+            <p className="mt-1 text-3xl font-bold text-token">{tokens.toLocaleString()} tokens</p>
+            <p className="mt-1 text-xs text-muted">
+              Earned by swapping, or bought. Used to balance value gaps.
             </p>
           </div>
           <a
             href="/wallet"
-            className="rounded-md border border-indigo-500 px-4 py-2 text-sm font-semibold text-indigo-200 hover:bg-indigo-900"
+            className="rounded-btn border border-token/40 px-4 py-2 text-sm font-semibold text-token transition-colors hover:bg-token/15"
           >
             View history
           </a>
@@ -61,17 +61,17 @@ export default async function ProfilePage() {
       </div>
 
       {ratings && ratings.total > 0 && (
-        <div className="rounded-xl border border-gray-700 bg-gray-800 p-6">
-          <h2 className="text-sm font-semibold text-white">Recent ratings</h2>
+        <div className="rounded-card border border-line bg-surface p-6">
+          <h2 className="text-sm font-semibold text-foreground">Recent ratings</h2>
           <div className="mt-3 flex flex-col gap-3">
             {ratings.ratings.slice(0, 5).map((r) => (
-              <div key={r.id} className="rounded-lg bg-gray-900 p-3 text-sm">
-                <p className="text-gray-300">
-                  <span className="font-semibold text-white">{r.rater.name}</span>{" "}
+              <div key={r.id} className="rounded-btn bg-surface-2 p-3 text-sm">
+                <p className="text-muted">
+                  <span className="font-semibold text-foreground">{r.rater.name}</span>{" "}
                   {"★".repeat(r.score)}
-                  <span className="text-gray-600">{"★".repeat(5 - r.score)}</span>
+                  <span className="text-line-strong">{"★".repeat(5 - r.score)}</span>
                 </p>
-                {r.comment && <p className="mt-1 text-gray-400">&ldquo;{r.comment}&rdquo;</p>}
+                {r.comment && <p className="mt-1 text-muted">&ldquo;{r.comment}&rdquo;</p>}
               </div>
             ))}
           </div>
@@ -79,7 +79,7 @@ export default async function ProfilePage() {
       )}
 
       {user.admin && (
-        <Link href="/admin" className="rounded-xl border border-red-500/40 bg-red-950 p-4 text-sm font-semibold text-red-200 hover:bg-red-900">
+        <Link href="/admin" className="rounded-card border border-rose-500/40 bg-rose-950 p-4 text-sm font-semibold text-rose-200 transition-colors hover:bg-rose-900">
           Admin dashboard →
         </Link>
       )}

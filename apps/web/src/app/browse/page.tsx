@@ -1,33 +1,9 @@
-import { fetchItems, itemValue, type ApiItem } from "@/lib/api";
-import { CATEGORY_LABELS, CONDITION_LABELS, CATEGORIES, CONDITIONS } from "@swapify/shared";
+import { fetchItems, type ApiItem } from "@/lib/api";
+import { CATEGORIES, CONDITIONS, CATEGORY_LABELS, CONDITION_LABELS } from "@swapify/shared";
 import Link from "next/link";
-
-function ItemCard({ item }: { item: ApiItem }) {
-  const img = item.images[0]?.url;
-  return (
-    <Link
-      href={`/items/${item.id}`}
-      className="group overflow-hidden rounded-xl border border-gray-700 bg-gray-800 transition hover:border-indigo-500"
-    >
-      {img ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={img} alt={item.title} className="h-48 w-full object-cover" />
-      ) : (
-        <div className="flex h-48 w-full items-center justify-center bg-gray-900 text-sm text-gray-500">
-          No photo
-        </div>
-      )}
-      <div className="p-4">
-        <p className="text-xs text-indigo-400">{CATEGORY_LABELS[item.category as keyof typeof CATEGORY_LABELS] ?? item.category}</p>
-        <h3 className="mt-1 font-semibold text-white group-hover:text-indigo-300">{item.title}</h3>
-        <div className="mt-2 flex items-center justify-between text-sm">
-          <span className="text-gray-400">{CONDITION_LABELS[item.condition as keyof typeof CONDITION_LABELS] ?? item.condition}</span>
-          <span className="font-semibold text-white">{itemValue(item)} tokens</span>
-        </div>
-      </div>
-    </Link>
-  );
-}
+import ItemCard from "@/components/ItemCard";
+import Button from "@/components/Button";
+import { Search } from "lucide-react";
 
 export default async function BrowsePage({
   searchParams,
@@ -37,49 +13,75 @@ export default async function BrowsePage({
   const params = await searchParams;
   const { items, total } = await fetchItems(params);
 
+  const inputClass =
+    "h-10 rounded-btn border border-line bg-surface-2 px-3 text-sm text-foreground placeholder:text-muted focus:border-primary/60 focus:outline-none";
+
   return (
-    <main className="mx-auto max-w-6xl flex-1 px-6 py-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-white">Browse listings</h1>
-        <Link
-          href="/post"
-          className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500"
-        >
-          + Post an item
-        </Link>
+    <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-10 sm:px-6 lg:px-8">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Browse listings</h1>
+          <p className="mt-1 text-sm text-muted">
+            Swap for what you need with people nearby — no cash required.
+          </p>
+        </div>
+        <Button href="/post">
+          <span aria-hidden>+</span> Post an item
+        </Button>
       </div>
 
-      <form method="get" className="mt-6 flex flex-wrap gap-3">
-        <input
-          name="q"
-          defaultValue={params.q}
-          placeholder="Search items..."
-          className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-white placeholder:text-gray-500"
-        />
-        <select name="category" defaultValue={params.category ?? ""} className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-white">
+      <form method="get" className="mt-8 flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[220px]">
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
+            aria-hidden
+          />
+          <input
+            name="q"
+            defaultValue={params.q}
+            placeholder="Search items..."
+            className={`${inputClass} w-full pl-9`}
+          />
+        </div>
+        <select name="category" defaultValue={params.category ?? ""} className={inputClass}>
           <option value="">All categories</option>
           {CATEGORIES.map((c) => (
-            <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>
+            <option key={c} value={c}>
+              {CATEGORY_LABELS[c]}
+            </option>
           ))}
         </select>
-        <select name="condition" defaultValue={params.condition ?? ""} className="rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-white">
+        <select name="condition" defaultValue={params.condition ?? ""} className={inputClass}>
           <option value="">Any condition</option>
           {CONDITIONS.map((c) => (
-            <option key={c} value={c}>{CONDITION_LABELS[c]}</option>
+            <option key={c} value={c}>
+              {CONDITION_LABELS[c]}
+            </option>
           ))}
         </select>
-        <button type="submit" className="rounded-md bg-gray-700 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-600">
+        <button
+          type="submit"
+          className="h-10 rounded-btn bg-surface-3 px-4 text-sm font-semibold text-foreground transition-colors hover:border-primary/60 hover:bg-surface-2"
+        >
           Filter
         </button>
       </form>
 
-      <p className="mt-6 text-sm text-gray-400">{total} listing{total === 1 ? "" : "s"}</p>
+      <p className="mt-6 text-sm text-muted">
+        {total} listing{total === 1 ? "" : "s"}
+      </p>
 
       {items.length === 0 ? (
-        <p className="mt-10 text-gray-400">No listings match. Try a different filter.</p>
+        <div className="mt-12 flex flex-col items-center gap-3 rounded-card border border-dashed border-line bg-surface/50 py-16 text-center">
+          <p className="text-foreground">No listings match your filters.</p>
+          <p className="text-sm text-muted">Try a different keyword, category, or condition.</p>
+          <Link href="/browse" className="mt-2 text-sm font-semibold text-primary-soft hover:text-foreground">
+            Clear filters
+          </Link>
+        </div>
       ) : (
         <div className="mt-4 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {items.map((item) => (
+          {items.map((item: ApiItem) => (
             <ItemCard key={item.id} item={item} />
           ))}
         </div>

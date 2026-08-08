@@ -42,7 +42,7 @@ export default function SwapActions({ swap, accessToken, myUserId }: Props) {
             type="button"
             disabled={busy}
             onClick={() => act(acceptSwap)}
-            className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50"
+            className="rounded-btn bg-brand px-3 py-1.5 text-sm font-semibold text-white shadow-glow transition-all hover:brightness-110 disabled:opacity-50"
           >
             Accept
           </button>
@@ -50,7 +50,7 @@ export default function SwapActions({ swap, accessToken, myUserId }: Props) {
             type="button"
             disabled={busy}
             onClick={() => act(declineSwap)}
-            className="rounded-md border border-red-500 px-3 py-1.5 text-sm font-semibold text-red-300 hover:bg-red-950 disabled:opacity-50"
+            className="rounded-btn border border-rose-500 px-3 py-1.5 text-sm font-semibold text-rose-300 hover:bg-rose-950 disabled:opacity-50"
           >
             Decline
           </button>
@@ -62,7 +62,7 @@ export default function SwapActions({ swap, accessToken, myUserId }: Props) {
           type="button"
           disabled={busy}
           onClick={() => act(cancelSwap)}
-          className="mt-2 text-xs text-gray-400 underline hover:text-gray-200 disabled:opacity-50"
+          className="mt-2 text-xs text-muted underline hover:text-foreground disabled:opacity-50"
         >
           Cancel this swap
         </button>
@@ -73,7 +73,7 @@ export default function SwapActions({ swap, accessToken, myUserId }: Props) {
           type="button"
           disabled={busy}
           onClick={() => act(fundSwap)}
-          className="mt-3 w-full rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+          className="mt-3 w-full rounded-btn bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition-all hover:bg-emerald-500 disabled:opacity-50"
         >
           {busy ? "Holding..." : `Fund escrow (${Number(BigInt(swap.gapMicroTokens)) / 1_000_000} tokens)`}
         </button>
@@ -86,7 +86,7 @@ export default function SwapActions({ swap, accessToken, myUserId }: Props) {
               type="button"
               disabled={busy}
               onClick={() => act(confirmSwap)}
-              className="mt-3 w-full rounded-md border border-emerald-500 px-3 py-2 text-sm font-semibold text-emerald-300 hover:bg-emerald-950 disabled:opacity-50"
+              className="mt-3 w-full rounded-btn border border-emerald-500 px-3 py-2 text-sm font-semibold text-emerald-300 hover:bg-emerald-950 disabled:opacity-50"
             >
               Confirm I received my item
             </button>
@@ -98,7 +98,7 @@ export default function SwapActions({ swap, accessToken, myUserId }: Props) {
               type="button"
               disabled={busy}
               onClick={() => act(cancelSwap)}
-              className="mt-2 text-xs text-gray-400 underline hover:text-gray-200 disabled:opacity-50"
+              className="mt-2 text-xs text-muted underline hover:text-foreground disabled:opacity-50"
             >
               Cancel this swap
             </button>
@@ -106,7 +106,7 @@ export default function SwapActions({ swap, accessToken, myUserId }: Props) {
         </>
       )}
 
-      {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
+      {error && <p className="mt-2 text-sm text-rose-400">{error}</p>}
     </div>
   );
 }

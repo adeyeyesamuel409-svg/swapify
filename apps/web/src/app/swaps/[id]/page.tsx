@@ -31,42 +31,42 @@ export default async function SwapDetailPage({ params }: { params: Promise<{ id:
   const completed = swap.status === "COMPLETED";
 
   return (
-    <main className="mx-auto max-w-3xl flex-1 px-6 py-12">
-      <Link href="/swaps" className="text-sm text-indigo-400 hover:underline">
+    <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-12 sm:px-6">
+      <Link href="/swaps" className="text-sm font-medium text-primary-soft hover:text-foreground">
         &larr; My swaps
       </Link>
 
-      <h1 className="mt-3 text-2xl font-bold text-white">Swap detail</h1>
+      <h1 className="mt-3 text-2xl font-bold tracking-tight text-foreground">Swap detail</h1>
 
-      <div className="mt-5 rounded-xl border border-gray-700 bg-gray-800 p-5">
-        <span className="rounded-full border border-gray-600 bg-gray-900 px-3 py-0.5 text-xs font-semibold text-gray-200">
+      <div className="mt-5 rounded-card border border-line bg-surface p-5 shadow-card">
+        <span className="inline-flex rounded-pill border border-line bg-surface-2 px-3 py-0.5 text-xs font-semibold text-foreground/90">
           {SWAP_STATUS_LABELS[swap.status] ?? swap.status}
         </span>
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <div className="rounded-lg border border-gray-700 bg-gray-900 p-3">
-            <p className="text-xs text-gray-500">{amOffering ? "You offer" : `${swap.offeringUser.name} offers`}</p>
-            <Link href={`/items/${swap.offeringItem.id}`} className="mt-1 block truncate font-semibold text-indigo-300 hover:underline">
+          <div className="rounded-btn border border-line bg-surface-2 p-3">
+            <p className="text-xs text-muted">{amOffering ? "You offer" : `${swap.offeringUser.name} offers`}</p>
+            <Link href={`/items/${swap.offeringItem.id}`} className="mt-1 block truncate font-semibold text-primary-soft hover:underline">
               {swap.offeringItem.title}
             </Link>
-            <p className="text-xs text-indigo-300">{itemValue(swap.offeringItem)} tokens</p>
+            <p className="text-xs text-primary-soft">{itemValue(swap.offeringItem)} tokens</p>
           </div>
-          <div className="rounded-lg border border-gray-700 bg-gray-900 p-3">
-            <p className="text-xs text-gray-500">{amOffering ? `${swap.requestedUser.name} offers` : "You receive"}</p>
-            <Link href={`/items/${swap.requestedItem.id}`} className="mt-1 block truncate font-semibold text-indigo-300 hover:underline">
+          <div className="rounded-btn border border-line bg-surface-2 p-3">
+            <p className="text-xs text-muted">{amOffering ? `${swap.requestedUser.name} offers` : "You receive"}</p>
+            <Link href={`/items/${swap.requestedItem.id}`} className="mt-1 block truncate font-semibold text-primary-soft hover:underline">
               {swap.requestedItem.title}
             </Link>
-            <p className="text-xs text-indigo-300">{itemValue(swap.requestedItem)} tokens</p>
+            <p className="text-xs text-primary-soft">{itemValue(swap.requestedItem)} tokens</p>
           </div>
         </div>
 
         {gapTokens > 0 && (
-          <p className="mt-3 text-xs text-gray-400">
-            Value gap: <span className="font-semibold text-amber-300">{gapTokens} tokens</span>
+          <p className="mt-3 text-xs text-muted">
+            Value gap: <span className="font-semibold text-token">{gapTokens} tokens</span>
           </p>
         )}
         {swap.expiresAt && active && (
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="mt-1 text-xs text-muted">
             Expires {new Date(swap.expiresAt).toLocaleString()}
           </p>
         )}

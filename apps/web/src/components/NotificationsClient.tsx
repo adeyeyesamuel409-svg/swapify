@@ -39,18 +39,18 @@ export default function NotificationsClient({ initial, accessToken }: Props) {
   const unread = notifications.filter((n) => !n.read).length;
 
   return (
-    <main className="mx-auto max-w-2xl flex-1 px-6 py-12">
+    <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-12 sm:px-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-white">Notifications</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-foreground">Notifications</h1>
         {unread > 0 && (
-          <button type="button" onClick={markAll} className="text-sm text-indigo-400 underline hover:text-indigo-300">
+          <button type="button" onClick={markAll} className="text-sm font-semibold text-primary-soft underline hover:text-foreground">
             Mark all as read
           </button>
         )}
       </div>
 
       {notifications.length === 0 ? (
-        <p className="mt-10 text-center text-gray-500">No notifications yet.</p>
+        <p className="mt-10 text-center text-muted">No notifications yet.</p>
       ) : (
         <div className="mt-6 flex flex-col gap-3">
           {notifications.map((n) => (
@@ -58,15 +58,17 @@ export default function NotificationsClient({ initial, accessToken }: Props) {
               key={n.id}
               type="button"
               onClick={() => markRead(n)}
-              className={`flex items-start justify-between gap-3 rounded-xl border p-4 text-left ${n.read ? "border-gray-700 bg-gray-800" : "border-indigo-500/40 bg-indigo-950"}`}
+              className={`flex items-start justify-between gap-3 rounded-card border p-4 text-left transition-all duration-200 ${
+                n.read ? "border-line bg-surface hover:border-line-strong" : "border-primary/40 bg-primary/10 hover:border-primary"
+              }`}
             >
               <div>
-                <p className={`text-sm ${n.read ? "text-gray-300" : "text-white"}`}>{n.body}</p>
-                <p className="mt-1 text-xs text-gray-500">
+                <p className={`text-sm ${n.read ? "text-muted" : "text-foreground"}`}>{n.body}</p>
+                <p className="mt-1 text-xs text-muted">
                   {NOTIFICATION_TYPE_LABELS[n.type] ?? n.type} · {new Date(n.createdAt).toLocaleString()}
                 </p>
               </div>
-              {!n.read && <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-indigo-400" />}
+              {!n.read && <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary-soft" />}
             </button>
           ))}
         </div>

@@ -33,7 +33,7 @@ export default function SwapRequestButton({ itemId, itemValueTokens }: Props) {
       <button
         type="button"
         onClick={() => signIn("cognito")}
-        className="mt-4 w-full rounded-md bg-indigo-600 px-4 py-3 font-semibold text-white hover:bg-indigo-500"
+        className="mt-4 w-full rounded-btn bg-brand px-4 py-3 font-semibold text-white shadow-glow transition-all hover:brightness-110"
       >
         Sign in to request this swap
       </button>
@@ -42,7 +42,7 @@ export default function SwapRequestButton({ itemId, itemValueTokens }: Props) {
 
   if (created) {
     return (
-      <div className="mt-4 rounded-md border border-emerald-500/40 bg-emerald-950 p-4 text-sm text-emerald-200">
+      <div className="mt-4 rounded-card border border-emerald-500/40 bg-emerald-950 p-4 text-sm text-emerald-200">
         Swap request sent! Awaiting the owner&apos;s decision.
         <Link href="/swaps" className="ml-2 font-semibold text-emerald-300 underline">
           View your swaps
@@ -73,21 +73,21 @@ export default function SwapRequestButton({ itemId, itemValueTokens }: Props) {
   };
 
   return (
-    <div className="mt-6 rounded-xl border border-indigo-500/30 bg-indigo-950 p-4">
-      <p className="text-sm font-semibold text-indigo-200">Swap for it</p>
-      <p className="mt-1 text-xs text-indigo-400">Offer one of your own items. Value gaps are settled with tokens.</p>
+    <div className="mt-6 rounded-card border border-primary/30 bg-primary/10 p-4">
+      <p className="text-sm font-semibold text-primary-soft">Swap for it</p>
+      <p className="mt-1 text-xs text-muted">Offer one of your own items. Value gaps are settled with tokens.</p>
 
       {myItems.length === 0 ? (
-        <p className="mt-3 text-sm text-gray-400">
+        <p className="mt-3 text-sm text-muted">
           You need an active listing to offer.{" "}
-          <Link href="/post" className="text-indigo-300 underline">
+          <Link href="/post" className="text-primary-soft underline">
             Post an item
           </Link>
         </p>
       ) : (
         <>
           <select
-            className="mt-3 w-full rounded-md border border-indigo-500 bg-gray-800 px-3 py-2 text-white"
+            className="mt-3 w-full rounded-btn border border-primary/40 bg-surface-2 px-3 py-2 text-sm text-foreground focus:border-primary/60 focus:outline-none"
             value={selectedId}
             onChange={(e) => setSelectedId(e.target.value)}
           >
@@ -100,7 +100,7 @@ export default function SwapRequestButton({ itemId, itemValueTokens }: Props) {
           </select>
 
           {selected && gap !== null && (
-            <p className="mt-2 text-xs text-indigo-300">
+            <p className="mt-2 text-xs text-primary-soft">
               {gap === 0
                 ? "Values match — no tokens needed."
                 : iPay
@@ -109,13 +109,13 @@ export default function SwapRequestButton({ itemId, itemValueTokens }: Props) {
             </p>
           )}
 
-          {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
+          {error && <p className="mt-2 text-sm text-rose-400">{error}</p>}
 
           <button
             type="button"
             onClick={submit}
             disabled={!selectedId || submitting}
-            className="mt-3 w-full rounded-md bg-indigo-600 px-4 py-2.5 font-semibold text-white hover:bg-indigo-500 disabled:opacity-50"
+            className="mt-3 w-full rounded-btn bg-brand px-4 py-2.5 font-semibold text-white shadow-glow transition-all hover:brightness-110 disabled:opacity-50"
           >
             {submitting ? "Sending..." : "Request swap"}
           </button>

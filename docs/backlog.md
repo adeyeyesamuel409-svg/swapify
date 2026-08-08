@@ -64,7 +64,16 @@ Legend: [ ] not started · [x] done · [-] in progress
 - [x] Admin dashboard: users, listings, disputes (users + listings + token credit; disputes deferred)
 - [ ] Email notifications (SES)
 
-## Sprint 8 - Deploy to AWS
+## Sprint 8 - UI/UX refinement & design system
+- [x] Design tokens + dark premium theme (palette, typography, spacing, radius, shadows) in globals.css
+- [x] Shared UI primitives: Button, ItemCard, StatusPill, SectionHeader, PlaceholderImage
+- [x] Global sticky header: logo, nav, search, token balance, notification bell, avatar menu, mobile menu
+- [x] Global footer with marketplace / account / tokens link columns
+- [x] New homepage: hero with real featured photos, featured listings, how it works, categories, tokens explainer, final CTA
+- [x] Restyle inner pages (browse, item detail, post, wallet, swaps, tokens, wishlists, notifications, profile, admin) to the new system
+- [x] Fix homepage horizontal overflow; responsive at mobile / tablet / laptop / desktop / ultrawide
+
+## Sprint 9 - Deploy to AWS
 - [ ] Dockerfiles for API and web
 - [ ] ECS Fargate services + Application Load Balancer
 - [ ] Migrate Postgres Docker -> RDS; Redis Docker -> ElastiCache
@@ -72,7 +81,7 @@ Legend: [ ] not started · [x] done · [-] in progress
 - [ ] Route 53 custom domain + HTTPS
 - [ ] CloudWatch logging and alerts
 
-## Sprint 9 - Scale & AI
+## Sprint 10 - Scale & AI
 - [ ] Auto-scaling policies and load testing (k6)
 - [ ] Image resize pipeline (S3 + Lambda)
 - [ ] AI valuation interface (pluggable ValuationService)

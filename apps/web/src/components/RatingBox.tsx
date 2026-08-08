@@ -43,28 +43,28 @@ export default function RatingBox({ swapId, accessToken, myUserId, otherPartyNam
   };
 
   return (
-    <div className="mt-6 rounded-xl border border-gray-700 bg-gray-800 p-5">
-      <p className="text-sm font-semibold text-white">Ratings</p>
+    <div className="mt-6 rounded-card border border-line bg-surface p-5">
+      <p className="text-sm font-semibold text-foreground">Ratings</p>
 
       {otherRating && (
-        <div className="mt-3 rounded-lg bg-gray-900 p-3 text-sm">
-          <p className="text-gray-300">
-            <span className="font-semibold text-white">{otherRating.rater.name}</span> rated you{" "}
+        <div className="mt-3 rounded-btn bg-surface-2 p-3 text-sm">
+          <p className="text-muted">
+            <span className="font-semibold text-foreground">{otherRating.rater.name}</span> rated you{" "}
             {"★".repeat(otherRating.score)}
-            <span className="text-gray-500">{"★".repeat(5 - otherRating.score)}</span>
+            <span className="text-line-strong">{"★".repeat(5 - otherRating.score)}</span>
           </p>
-          {otherRating.comment && <p className="mt-1 text-gray-400">&ldquo;{otherRating.comment}&rdquo;</p>}
+          {otherRating.comment && <p className="mt-1 text-muted">&ldquo;{otherRating.comment}&rdquo;</p>}
         </div>
       )}
 
       {myRating ? (
-        <div className="mt-3 rounded-lg bg-gray-900 p-3 text-sm">
-          <p className="text-gray-300">
-            You rated <span className="font-semibold text-white">{otherPartyName}</span>{" "}
+        <div className="mt-3 rounded-btn bg-surface-2 p-3 text-sm">
+          <p className="text-muted">
+            You rated <span className="font-semibold text-foreground">{otherPartyName}</span>{" "}
             {"★".repeat(myRating.score)}
-            <span className="text-gray-500">{"★".repeat(5 - myRating.score)}</span>
+            <span className="text-line-strong">{"★".repeat(5 - myRating.score)}</span>
           </p>
-          {myRating.comment && <p className="mt-1 text-gray-400">&ldquo;{myRating.comment}&rdquo;</p>}
+          {myRating.comment && <p className="mt-1 text-muted">&ldquo;{myRating.comment}&rdquo;</p>}
         </div>
       ) : (
         <div className="mt-3">
@@ -74,7 +74,8 @@ export default function RatingBox({ swapId, accessToken, myUserId, otherPartyNam
                 key={s}
                 type="button"
                 onClick={() => setScore(s)}
-                className={`text-2xl ${s <= score ? "text-amber-400" : "text-gray-600"}`}
+                className={`text-2xl transition-colors ${s <= score ? "text-token" : "text-line-strong"}`}
+                aria-label={`Rate ${s} star${s === 1 ? "" : "s"}`}
               >
                 ★
               </button>
@@ -85,20 +86,20 @@ export default function RatingBox({ swapId, accessToken, myUserId, otherPartyNam
             onChange={(e) => setComment(e.target.value)}
             placeholder="How was the swap?"
             rows={2}
-            className="mt-3 w-full rounded-md border border-gray-600 bg-gray-900 px-3 py-2 text-sm text-white placeholder:text-gray-500"
+            className="mt-3 w-full rounded-btn border border-line bg-surface-2 px-3 py-2 text-sm text-foreground placeholder:text-muted focus:border-primary/60 focus:outline-none"
           />
           <button
             type="button"
             disabled={busy}
             onClick={submit}
-            className="mt-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50"
+            className="mt-2 rounded-btn bg-brand px-4 py-2 text-sm font-semibold text-white shadow-glow transition-all hover:brightness-110 disabled:opacity-50"
           >
             {busy ? "Saving..." : "Submit rating"}
           </button>
         </div>
       )}
 
-      {error && <p className="mt-2 text-xs text-red-400">{error}</p>}
+      {error && <p className="mt-2 text-xs text-rose-400">{error}</p>}
     </div>
   );
 }

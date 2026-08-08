@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
+import { Bell } from "lucide-react";
 import { fetchUnreadCount } from "@/lib/api";
 
 export default function NotificationBell() {
@@ -33,12 +34,12 @@ export default function NotificationBell() {
   return (
     <Link
       href="/notifications"
-      className="relative rounded-md border border-gray-600 px-3 py-2 text-sm font-semibold text-gray-200 hover:bg-gray-700"
+      className="relative flex h-9 w-9 items-center justify-center rounded-btn border border-line bg-surface-2 text-muted transition-colors hover:border-primary/60 hover:text-foreground"
       aria-label="Notifications"
     >
-      <span aria-hidden>🔔</span>
+      <Bell className="h-4 w-4" aria-hidden />
       {count > 0 && (
-        <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+        <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-pill bg-rose-500 px-1 text-[10px] font-bold text-white">
           {count > 99 ? "99+" : count}
         </span>
       )}

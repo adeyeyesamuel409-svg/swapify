@@ -36,16 +36,16 @@ export default function AdminActions({ accessToken, users, items }: Props) {
 
   return (
     <div className="mt-10 flex flex-col gap-8">
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {error && <p className="text-sm text-rose-400">{error}</p>}
 
       <section>
-        <h2 className="text-xl font-bold text-white">Users</h2>
-        <div className="mt-3 overflow-hidden rounded-xl border border-gray-700">
+        <h2 className="text-xl font-bold text-foreground">Users</h2>
+        <div className="mt-3 overflow-hidden rounded-card border border-line">
           {users.map((u) => (
-            <div key={u.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-700 bg-gray-800 px-4 py-3 last:border-b-0">
+            <div key={u.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-surface px-4 py-3 last:border-b-0">
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-white">{u.name}</p>
-                <p className="truncate text-xs text-gray-500">
+                <p className="truncate text-sm font-semibold text-foreground">{u.name}</p>
+                <p className="truncate text-xs text-muted">
                   {u.email} · {Number(u.wallet?.balanceMicroTokens ?? "0") / 1_000_000} tokens ·{" "}
                   {u._count.items} items · {u._count.swapsOffered + u._count.swapsRequested} swaps ·{" "}
                   {u.admin ? `admin (${u.admin.role})` : "user"}
@@ -59,12 +59,12 @@ export default function AdminActions({ accessToken, users, items }: Props) {
                     value={credit.tokens}
                     onChange={(e) => setCredit({ userId: u.id, tokens: e.target.value })}
                     placeholder="tokens"
-                    className="w-24 rounded-md border border-gray-600 bg-gray-900 px-2 py-1 text-sm text-white"
+                    className="w-24 rounded-btn border border-line bg-surface-2 px-2 py-1 text-sm text-foreground"
                   />
-                  <button type="button" onClick={doCredit} className="rounded-md bg-emerald-600 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-500">
+                  <button type="button" onClick={doCredit} className="rounded-btn bg-emerald-600 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-500">
                     Confirm
                   </button>
-                  <button type="button" onClick={() => setCredit(null)} className="text-xs text-gray-400 hover:text-gray-200">
+                  <button type="button" onClick={() => setCredit(null)} className="text-xs text-muted hover:text-foreground">
                     Cancel
                   </button>
                 </div>
@@ -72,7 +72,7 @@ export default function AdminActions({ accessToken, users, items }: Props) {
                 <button
                   type="button"
                   onClick={() => setCredit({ userId: u.id, tokens: "" })}
-                  className="rounded-md border border-emerald-600 px-3 py-1 text-xs font-semibold text-emerald-300 hover:bg-emerald-950"
+                  className="rounded-btn border border-emerald-600 px-3 py-1 text-xs font-semibold text-emerald-300 hover:bg-emerald-950"
                 >
                   Credit tokens
                 </button>
@@ -83,13 +83,13 @@ export default function AdminActions({ accessToken, users, items }: Props) {
       </section>
 
       <section>
-        <h2 className="text-xl font-bold text-white">Listings</h2>
-        <div className="mt-3 overflow-hidden rounded-xl border border-gray-700">
+        <h2 className="text-xl font-bold text-foreground">Listings</h2>
+        <div className="mt-3 overflow-hidden rounded-card border border-line">
           {items.map((item) => (
-            <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-700 bg-gray-800 px-4 py-3 last:border-b-0">
+            <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-surface px-4 py-3 last:border-b-0">
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-white">{item.title}</p>
-                <p className="truncate text-xs text-gray-500">
+                <p className="truncate text-sm font-semibold text-foreground">{item.title}</p>
+                <p className="truncate text-xs text-muted">
                   {item.owner.name} · {Number(BigInt(item.valueMicroTokens)) / 1_000_000} tokens ·{" "}
                   {ITEM_STATUS_LABELS[item.status] ?? item.status}
                 </p>
@@ -101,7 +101,9 @@ export default function AdminActions({ accessToken, users, items }: Props) {
                     type="button"
                     disabled={item.status === s}
                     onClick={() => changeStatus(item.id, s)}
-                    className={`rounded-md border px-3 py-1 text-xs font-semibold disabled:opacity-40 ${item.status === s ? "border-gray-500 text-gray-300" : "border-gray-600 text-gray-300 hover:bg-gray-700"}`}
+                    className={`rounded-btn border px-3 py-1 text-xs font-semibold disabled:opacity-40 ${
+                      item.status === s ? "border-line-strong text-foreground" : "border-line text-muted hover:bg-surface-2"
+                    }`}
                   >
                     {ITEM_STATUS_LABELS[s]}
                   </button>

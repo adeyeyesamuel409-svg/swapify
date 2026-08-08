@@ -1,30 +1,31 @@
-import AuthControls from "@/components/AuthControls";
+import { fetchItems, type ApiItem } from "@/lib/api";
+import HeroSection from "@/components/home/HeroSection";
+import FeaturedSection from "@/components/home/FeaturedSection";
+import HowItWorksSection from "@/components/home/HowItWorksSection";
+import CategoriesSection from "@/components/home/CategoriesSection";
+import TokensExplainerSection from "@/components/home/TokensExplainerSection";
+import FinalCtaSection from "@/components/home/FinalCtaSection";
 
-export default function Home() {
+export default async function Home() {
+  let items: ApiItem[] = [];
+  try {
+    const result = await fetchItems();
+    items = result.items;
+  } catch {
+    items = [];
+  }
+
+  const active = items.filter((i) => i.status === "ACTIVE");
+  const featured = active.slice(0, 6);
+
   return (
-    <main className="flex flex-1 flex-col items-center justify-center gap-8 px-6">
-      <div className="text-center">
-        <h1 className="text-5xl font-bold tracking-tight text-white">Swapify</h1>
-        <p className="mt-4 max-w-xl text-lg text-gray-300">
-          Swap what you no longer use for what you need. When values don&apos;t
-          match, our tokens balance the difference.
-        </p>
-      </div>
-      <div className="flex items-center gap-4">
-        <a
-          href="/browse"
-          className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500"
-        >
-          Browse listings
-        </a>
-        <a
-          href="/post"
-          className="rounded-md border border-gray-600 px-4 py-2 text-sm font-semibold text-gray-200 hover:bg-gray-700"
-        >
-          Post an item
-        </a>
-      </div>
-      <AuthControls />
-    </main>
+    <>
+      <HeroSection items={active} />
+      <FeaturedSection items={featured} />
+      <HowItWorksSection />
+      <CategoriesSection />
+      <TokensExplainerSection items={active} />
+      <FinalCtaSection />
+    </>
   );
 }
