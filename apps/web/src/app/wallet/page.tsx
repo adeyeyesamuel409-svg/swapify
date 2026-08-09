@@ -20,11 +20,20 @@ export default async function WalletPage() {
   const session = await getServerSession(authOptions);
 
   if (!session?.user || !session.accessToken) {
-    redirect("/api/auth/signin");
+    redirect(`/api/auth/signin?callbackUrl=${encodeURIComponent("/wallet")}`);
   }
 
-  const { wallet, transactions } = await fetchWallet(session.accessToken);
-  const balance = Number(BigInt(wallet.balanceMicroTokens)) / 1_000_000;
+  let wallet: Awaited<ReturnType<typeof fetchWallet>>["wallet"] | null = null;
+  let transactions: Awaited<ReturnType<typeof fetchWallet>>["transactions"] = [];
+  let loadError = "";
+  try {
+    const result = await fetchWallet(session.accessToken);
+    wallet = result.wallet;
+    transactions = result.transactions;
+  } catch {
+    loadError = "We couldn't load your wallet right now.";
+  }
+  const balance = wallet ? Number(BigInt(wallet.balanceMicroTokens)) / 1_000_000 : 0;
 
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-10 sm:px-6">
@@ -43,37 +52,46 @@ export default async function WalletPage() {
         </p>
       </div>
 
-      <h2 className="mt-10 text-xl font-semibold text-foreground">Transaction history</h2>
-
-      {transactions.length === 0 ? (
-        <p className="mt-4 text-muted">No transactions yet.</p>
+      {loadError ? (
+        <div className="mt-10 rounded-card border border-rose-500/40 bg-rose-950/30 p-8 text-center">
+          <p className="text-foreground">{loadError}</p>
+          <p className="mt-1 text-sm text-muted">Please try again in a moment.</p>
+        </div>
       ) : (
-        <ul className="mt-4 divide-y divide-line rounded-card border border-line bg-surface">
-          {transactions.map((t) => {
-            const amount = Number(BigInt(t.amountMicroTokens)) / 1_000_000;
-            const credit = t.direction === "CREDIT";
-            return (
-              <li key={t.id} className="flex items-center justify-between gap-4 px-4 py-3">
-                <div>
-                  <p className="font-medium text-foreground">{TYPE_LABELS[t.type] ?? t.type}</p>
-                  <p className="text-xs text-muted">
-                    {new Date(t.createdAt).toLocaleString()}
-                    {t.note ? ` · ${t.note}` : ""}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className={`font-semibold ${credit ? "text-emerald-400" : "text-rose-400"}`}>
-                    {credit ? "+" : "-"}
-                    {amount.toLocaleString()} tokens
-                  </p>
-                  <p className="text-xs text-muted">
-                    Balance after: {Number(BigInt(t.balanceAfterMicroTokens)) / 1_000_000}
-                  </p>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+        <>
+          <h2 className="mt-10 text-xl font-semibold text-foreground">Transaction history</h2>
+
+          {transactions.length === 0 ? (
+            <p className="mt-4 text-muted">No transactions yet.</p>
+          ) : (
+            <ul className="mt-4 divide-y divide-line rounded-card border border-line bg-surface">
+              {transactions.map((t) => {
+                const amount = Number(BigInt(t.amountMicroTokens)) / 1_000_000;
+                const credit = t.direction === "CREDIT";
+                return (
+                  <li key={t.id} className="flex items-center justify-between gap-4 px-4 py-3">
+                    <div>
+                      <p className="font-medium text-foreground">{TYPE_LABELS[t.type] ?? t.type}</p>
+                      <p className="text-xs text-muted">
+                        {new Date(t.createdAt).toLocaleString()}
+                        {t.note ? ` · ${t.note}` : ""}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className={`font-semibold ${credit ? "text-emerald-400" : "text-rose-400"}`}>
+                        {credit ? "+" : "-"}
+                        {amount.toLocaleString()} tokens
+                      </p>
+                      <p className="text-xs text-muted">
+                        Balance after: {Number(BigInt(t.balanceAfterMicroTokens)) / 1_000_000}
+                      </p>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </>
       )}
     </main>
   );

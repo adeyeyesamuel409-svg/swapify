@@ -1,7 +1,7 @@
 import { ArrowRight, PackagePlus, ShieldCheck, Sparkles } from "lucide-react";
 import Button from "../Button";
 import type { ApiItem } from "@/lib/api";
-import { itemValue } from "@/lib/api";
+import { itemValue, resolveImageUrl } from "@/lib/api";
 
 function HeroPhoto({ item, className = "" }: { item: ApiItem; className?: string }) {
   const img = item.images[0]?.url;
@@ -9,7 +9,7 @@ function HeroPhoto({ item, className = "" }: { item: ApiItem; className?: string
     <div className={`relative overflow-hidden rounded-card border border-line bg-surface-2 ${className}`}>
       {img ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={img} alt={item.title} className="h-full w-full object-cover" />
+        <img src={resolveImageUrl(img)} alt={item.title} className="h-full w-full object-cover" />
       ) : (
         <div className="flex h-full w-full items-center justify-center text-xs text-muted">No photo</div>
       )}

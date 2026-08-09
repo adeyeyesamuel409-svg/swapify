@@ -2,7 +2,7 @@ import { ArrowRight, Coins } from "lucide-react";
 import Button from "../Button";
 import SectionHeader from "../SectionHeader";
 import type { ApiItem } from "@/lib/api";
-import { itemValue } from "@/lib/api";
+import { itemValue, resolveImageUrl } from "@/lib/api";
 
 function MiniItem({ item, side }: { item: ApiItem; side: "left" | "right" }) {
   const img = item.images[0]?.url;
@@ -15,7 +15,7 @@ function MiniItem({ item, side }: { item: ApiItem; side: "left" | "right" }) {
       <div className="h-28 bg-surface-3">
         {img ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={img} alt={item.title} className="h-full w-full object-cover" />
+          <img src={resolveImageUrl(img)} alt={item.title} className="h-full w-full object-cover" />
         ) : null}
       </div>
       <div className="p-3">

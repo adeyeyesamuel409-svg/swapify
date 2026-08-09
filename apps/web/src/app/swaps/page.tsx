@@ -96,19 +96,30 @@ export default async function SwapsPage() {
   const session = await getServerSession(authOptions);
 
   if (!session?.user || !session.accessToken) {
-    redirect("/api/auth/signin");
+    redirect(`/api/auth/signin?callbackUrl=${encodeURIComponent("/swaps")}`);
   }
 
-  const [{ swaps }, { user }] = await Promise.all([
-    fetchSwaps(session.accessToken),
-    fetchMe(session.accessToken),
-  ]);
+  let swaps: ApiSwap[] = [];
+  let userId = "";
+  let loadError = "";
+  try {
+    const results = await Promise.all([fetchSwaps(session.accessToken), fetchMe(session.accessToken)]);
+    swaps = results[0].swaps;
+    userId = results[1].user.id;
+  } catch {
+    loadError = "We couldn't load your swaps right now.";
+  }
 
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-12 sm:px-6">
       <h1 className="text-3xl font-bold tracking-tight text-foreground">My swaps</h1>
 
-      {swaps.length === 0 ? (
+      {loadError ? (
+        <div className="mt-8 rounded-card border border-rose-500/40 bg-rose-950/30 p-10 text-center">
+          <p className="text-foreground">{loadError}</p>
+          <p className="mt-1 text-sm text-muted">Please try again in a moment.</p>
+        </div>
+      ) : swaps.length === 0 ? (
         <div className="mt-8 rounded-card border border-line bg-surface p-10 text-center">
           <p className="text-muted">No swaps yet.</p>
           <Link href="/browse" className="mt-2 inline-block text-sm font-semibold text-primary-soft hover:text-foreground">
@@ -118,7 +129,7 @@ export default async function SwapsPage() {
       ) : (
         <div className="mt-6 flex flex-col gap-4">
           {swaps.map((swap) => (
-            <SwapCard key={swap.id} swap={swap} accessToken={session.accessToken!} myUserId={user.id} />
+            <SwapCard key={swap.id} swap={swap} accessToken={session.accessToken!} myUserId={userId} />
           ))}
         </div>
       )}

@@ -10,10 +10,20 @@ export default async function ProfilePage() {
   const session = await getServerSession(authOptions);
 
   if (!session?.user || !session.accessToken) {
-    redirect("/api/auth/signin");
+    redirect(`/api/auth/signin?callbackUrl=${encodeURIComponent("/profile")}`);
   }
 
-  const { user } = await fetchMe(session.accessToken);
+  let user: Awaited<ReturnType<typeof fetchMe>>["user"] | null = null;
+  try {
+    ({ user } = await fetchMe(session.accessToken));
+  } catch {
+    return (
+      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center gap-3 px-4 py-16 text-center sm:px-6">
+        <p className="text-foreground">We couldn&apos;t load your profile right now.</p>
+        <p className="text-sm text-muted">Please try again in a moment.</p>
+      </main>
+    );
+  }
   const ratings = await fetchUserRatings(user.id).catch(() => null);
   const tokens = user.wallet ? Number(user.wallet.balanceMicroTokens) / 1_000_000 : 0;
 

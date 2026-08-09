@@ -17,6 +17,7 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   session: { strategy: "jwt" },
+  pages: { signIn: "/signin" },
   callbacks: {
     // Stash the Cognito access token so the app can call the Swapify API.
     async jwt({ token, account }) {

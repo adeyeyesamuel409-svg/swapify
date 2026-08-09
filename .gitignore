@@ -32,3 +32,9 @@ Thumbs.db
 
 # Local infra
 infra/data/
+
+# Uploaded listing images (local storage backend)
+apps/api/uploads/
+
+# QA harness + artifacts (Playwright scripts, screenshots, tokens). Local only.
+qa/

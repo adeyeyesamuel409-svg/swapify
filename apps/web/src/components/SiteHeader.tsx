@@ -190,7 +190,7 @@ export default function SiteHeader() {
               <UserMenu />
             ) : (
               <button
-                onClick={() => signIn("cognito")}
+                onClick={() => signIn(undefined, { callbackUrl: window.location.pathname })}
                 className="h-9 rounded-btn bg-brand px-4 text-sm font-semibold text-white shadow-glow transition-all hover:brightness-110"
               >
                 Sign in / Sign up
@@ -232,7 +232,7 @@ export default function SiteHeader() {
               </div>
             ) : (
               <button
-                onClick={() => signIn("cognito")}
+                onClick={() => signIn(undefined, { callbackUrl: window.location.pathname })}
                 className="ml-auto h-9 rounded-btn bg-brand px-4 text-sm font-semibold text-white"
               >
                 Sign in

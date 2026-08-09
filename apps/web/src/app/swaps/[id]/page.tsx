@@ -6,21 +6,37 @@ import { fetchMe, fetchSwap, itemValue } from "@/lib/api";
 import { SWAP_STATUS_LABELS } from "@swapify/shared";
 import SwapActions from "@/components/SwapActions";
 import SwapChat from "@/components/SwapChat";
+import SwapTimeline from "@/components/SwapTimeline";
 import RatingBox from "@/components/RatingBox";
+import ItemImage from "@/components/ItemImage";
+import { ArrowRight } from "lucide-react";
 
 export const metadata = { title: "Swap - Swapify" };
 
 const ACTIVE_STATUSES = ["REQUESTED", "AGREED", "ESCROWED", "SHIPPED"];
 
 export default async function SwapDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user || !session.accessToken) redirect("/api/auth/signin");
-
   const { id } = await params;
-  const [{ swap }, { user }] = await Promise.all([
-    fetchSwap(session.accessToken, id),
-    fetchMe(session.accessToken),
+  const session = await getServerSession(authOptions);
+  if (!session?.user || !session.accessToken)
+    redirect(`/api/auth/signin?callbackUrl=${encodeURIComponent(`/swaps/${id}`)}`);
+
+  const [swapRes, meRes] = await Promise.all([
+    fetchSwap(session.accessToken, id).catch(() => null),
+    fetchMe(session.accessToken).catch(() => null),
   ]);
+
+  if (!swapRes || !meRes) {
+    return (
+      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-12 text-center sm:px-6">
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">Swap detail</h1>
+        <p className="mt-3 text-muted">We couldn&apos;t load this swap right now. Please try again in a moment.</p>
+      </main>
+    );
+  }
+
+  const { swap } = swapRes;
+  const { user } = meRes;
 
   if (swap.offeringUserId !== user.id && swap.requestedUserId !== user.id) notFound();
 
@@ -43,17 +59,38 @@ export default async function SwapDetailPage({ params }: { params: Promise<{ id:
           {SWAP_STATUS_LABELS[swap.status] ?? swap.status}
         </span>
 
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <div className="mt-4">
+          <SwapTimeline swap={swap} myUserId={user.id} />
+        </div>
+
+        <div className="mt-4 grid items-stretch gap-3 sm:grid-cols-[1fr_auto_1fr]">
           <div className="rounded-btn border border-line bg-surface-2 p-3">
             <p className="text-xs text-muted">{amOffering ? "You offer" : `${swap.offeringUser.name} offers`}</p>
-            <Link href={`/items/${swap.offeringItem.id}`} className="mt-1 block truncate font-semibold text-primary-soft hover:underline">
+            <div className="mt-2 aspect-[4/3] overflow-hidden rounded-btn border border-line bg-surface">
+              {swap.offeringItem.images[0] ? (
+                <ItemImage src={swap.offeringItem.images[0].url} alt={swap.offeringItem.title} />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-xs text-muted">No photo</div>
+              )}
+            </div>
+            <Link href={`/items/${swap.offeringItem.id}`} className="mt-2 block truncate font-semibold text-primary-soft hover:underline">
               {swap.offeringItem.title}
             </Link>
             <p className="text-xs text-primary-soft">{itemValue(swap.offeringItem)} tokens</p>
           </div>
+          <div className="hidden items-center justify-center sm:flex">
+            <ArrowRight className="h-5 w-5 text-primary-soft" aria-hidden />
+          </div>
           <div className="rounded-btn border border-line bg-surface-2 p-3">
             <p className="text-xs text-muted">{amOffering ? `${swap.requestedUser.name} offers` : "You receive"}</p>
-            <Link href={`/items/${swap.requestedItem.id}`} className="mt-1 block truncate font-semibold text-primary-soft hover:underline">
+            <div className="mt-2 aspect-[4/3] overflow-hidden rounded-btn border border-line bg-surface">
+              {swap.requestedItem.images[0] ? (
+                <ItemImage src={swap.requestedItem.images[0].url} alt={swap.requestedItem.title} />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-xs text-muted">No photo</div>
+              )}
+            </div>
+            <Link href={`/items/${swap.requestedItem.id}`} className="mt-2 block truncate font-semibold text-primary-soft hover:underline">
               {swap.requestedItem.title}
             </Link>
             <p className="text-xs text-primary-soft">{itemValue(swap.requestedItem)} tokens</p>

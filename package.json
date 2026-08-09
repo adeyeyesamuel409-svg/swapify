@@ -24,6 +24,7 @@
     "node": ">=20"
   },
   "devDependencies": {
-    "concurrently": "^10.0.4"
+    "concurrently": "^10.0.4",
+    "playwright-core": "^1.62.1"
   }
 }

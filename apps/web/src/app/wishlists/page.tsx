@@ -8,9 +8,14 @@ export const metadata = { title: "My Wishlists - Swapify" };
 
 export default async function WishlistsPage() {
   const session = await getServerSession(authOptions);
-  if (!session?.user || !session.accessToken) redirect("/api/auth/signin");
+  if (!session?.user || !session.accessToken) redirect(`/api/auth/signin?callbackUrl=${encodeURIComponent("/wishlists")}`);
 
-  const { wishlists } = await fetchWishlists(session.accessToken);
+  let wishlists: ApiWishlist[] = [];
+  try {
+    ({ wishlists } = await fetchWishlists(session.accessToken));
+  } catch {
+    wishlists = [];
+  }
 
   const withMatches = await Promise.all(
     wishlists.map(async (w: ApiWishlist) => {

@@ -61,6 +61,8 @@ const listItemsSchema = {
       ownerId: { type: 'string' },
       page: { type: 'integer', minimum: 1, default: 1 },
       pageSize: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+      // newest | value_asc | value_desc
+      sort: { type: 'string', enum: ['newest', 'value_asc', 'value_desc'], default: 'newest' },
     },
   },
 } as const;
@@ -72,16 +74,17 @@ type ListItemQuery = {
   ownerId?: string;
   page: number;
   pageSize: number;
+  sort?: 'newest' | 'value_asc' | 'value_desc';
 };
 
 const itemInclude = {
   images: { orderBy: { position: 'asc' as const } },
-  owner: { select: { id: true, name: true, imageUrl: true } },
+  owner: { select: { id: true, name: true, imageUrl: true, createdAt: true } },
 };
 
 const itemsRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
   app.get('/items', { schema: listItemsSchema }, async (request) => {
-    const { category, condition, q, ownerId, page, pageSize } = request.query as ListItemQuery;
+    const { category, condition, q, ownerId, page, pageSize, sort = 'newest' } = request.query as ListItemQuery;
 
     const where: Record<string, unknown> = {};
 
@@ -100,11 +103,18 @@ const itemsRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
       ];
     }
 
+    const orderBy =
+      sort === 'value_asc'
+        ? [{ valueMicroTokens: 'asc' as const }, { createdAt: 'desc' as const }]
+        : sort === 'value_desc'
+          ? [{ valueMicroTokens: 'desc' as const }, { createdAt: 'desc' as const }]
+          : [{ createdAt: 'desc' as const }];
+
     const [items, total] = await Promise.all([
       prisma.item.findMany({
         where,
         include: itemInclude,
-        orderBy: { createdAt: 'desc' },
+        orderBy,
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),

@@ -20,7 +20,7 @@ export type ApiItem = {
   status: string;
   createdAt: string;
   images: { id: string; url: string }[];
-  owner: { id: string; name: string; imageUrl: string | null };
+  owner: { id: string; name: string; imageUrl: string | null; createdAt: string };
 };
 
 export type ListItemsResult = {
@@ -41,6 +41,35 @@ export async function apiFetch<T>(path: string, accessToken?: string): Promise<T
   }
 
   return res.json() as Promise<T>;
+}
+
+// Listing images are stored as either external absolute URLs (legacy listings)
+// or relative public paths (/uploads/<file>) produced by the upload pipeline.
+// Relative paths are resolved against the configured API base URL so the same
+// database value works in dev and production.
+export function resolveImageUrl(url: string): string {
+  return url.startsWith("/") ? `${API_URL}${url}` : url;
+}
+
+// Upload images as multipart. Returns relative URLs to attach to an item.
+export async function uploadImages(accessToken: string, files: File[]): Promise<{ url: string }[]> {
+  const form = new FormData();
+  for (const file of files) form.append("images", file);
+
+  const res = await fetch(`${API_URL}/uploads`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}` },
+    body: form,
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.error ?? `Upload failed: ${res.status}`);
+  }
+
+  const data = (await res.json()) as { files: { url: string }[] };
+  return data.files;
 }
 
 export type ApiWallet = {
@@ -72,13 +101,22 @@ export function fetchMe(accessToken: string): Promise<{ user: ApiUser }> {
 }
 
 export function fetchItems(
-  filters?: { q?: string; category?: string; condition?: string; page?: number },
+  filters?: {
+    q?: string;
+    category?: string;
+    condition?: string;
+    sort?: "newest" | "value_asc" | "value_desc";
+    page?: number;
+    pageSize?: number;
+  },
 ): Promise<ListItemsResult> {
   const params = new URLSearchParams();
   if (filters?.q) params.set("q", filters.q);
   if (filters?.category) params.set("category", filters.category);
   if (filters?.condition) params.set("condition", filters.condition);
+  if (filters?.sort) params.set("sort", filters.sort);
   if (filters?.page) params.set("page", String(filters.page));
+  if (filters?.pageSize) params.set("pageSize", String(filters.pageSize));
   const qs = params.toString();
   return apiFetch(`/items${qs ? `?${qs}` : ""}`);
 }
@@ -115,6 +153,26 @@ export async function createItem(
 
 export function itemValue(item: ApiItem): number {
   return Number(BigInt(item.valueMicroTokens)) / 1_000_000;
+}
+
+export function timeAgo(dateValue: string): string {
+  const seconds = Math.floor((Date.now() - new Date(dateValue).getTime()) / 1000);
+  if (Number.isNaN(seconds) || seconds < 0) return "recently";
+  const units: [number, string][] = [
+    [31536000, "y"],
+    [2592000, "mo"],
+    [604800, "w"],
+    [86400, "d"],
+    [3600, "h"],
+    [60, "m"],
+  ];
+  for (const [size, label] of units) {
+    if (seconds >= size) {
+      const value = Math.floor(seconds / size);
+      return `${value}${label} ago`;
+    }
+  }
+  return "just now";
 }
 
 export type ApiSwap = {
@@ -249,6 +307,16 @@ export function rateSwap(
 
 export function fetchUserRatings(userId: string): Promise<{ ratings: ApiRating[]; averageScore: number | null; total: number }> {
   return apiFetch(`/users/${userId}/ratings`);
+}
+
+export type ApiUserProfile = {
+  user: { id: string; name: string; imageUrl: string | null; bio: string | null; createdAt: string };
+  rating: { averageScore: number | null; total: number };
+  completedSwaps: number;
+};
+
+export function fetchUserProfile(userId: string): Promise<ApiUserProfile> {
+  return apiFetch(`/users/${userId}`);
 }
 
 export function fetchSwapRatings(accessToken: string, swapId: string): Promise<{ ratings: ApiRating[] }> {

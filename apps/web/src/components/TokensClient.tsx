@@ -26,7 +26,7 @@ export default function TokensClient({ paid }: { paid: boolean }) {
       <main className="mx-auto max-w-xl flex-1 px-6 py-16 text-center">
         <h1 className="text-2xl font-bold text-foreground">Buy tokens</h1>
         <p className="mt-2 text-muted">
-          <button onClick={() => signIn("cognito")} className="text-primary-soft hover:underline">
+          <button onClick={() => signIn("cognito", { callbackUrl: window.location.pathname })} className="text-primary-soft hover:underline">
             Sign in
           </button>{" "}
           to buy tokens for swapping.
