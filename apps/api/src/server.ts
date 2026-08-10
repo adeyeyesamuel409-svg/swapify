@@ -2,6 +2,10 @@ import 'dotenv/config';
 import { FastifyInstance } from 'fastify';
 import { buildApp } from './app.js';
 import { startEscrowSweeper } from './services/escrow.js';
+import { validateConfig } from './config.js';
+
+// Fail fast on production configuration mistakes before binding the port.
+validateConfig();
 
 const port = Number(process.env.PORT ?? 4000);
 const host = process.env.HOST ?? '0.0.0.0';

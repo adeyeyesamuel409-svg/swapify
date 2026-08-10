@@ -1,0 +1,181 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Swapify - private S3 image bucket + CloudFront distribution with Origin Access Control (production image storage)"
+
+Parameters:
+  EnvName:
+    Type: String
+    Default: prod
+    Description: Environment tag/suffix for resource names.
+  BucketName:
+    Type: String
+    Default: swapify-images-prod
+    Description: Globally unique S3 bucket name.
+  S3Prefix:
+    Type: String
+    Default: uploads
+    Description: Object key prefix the API writes images under (matches STORAGE/S3_PREFIX).
+  CloudFrontPriceClass:
+    Type: String
+    Default: PriceClass_100
+    AllowedValues: [PriceClass_100, PriceClass_200, PriceClass_All]
+    Description: CloudFront price class (PriceClass_100 = US/EU only, cheapest egress).
+  CustomDomainName:
+    Type: String
+    Default: ""
+    Description: Optional CloudFront alternate domain (e.g. images.swapify.app). Requires AcmCertificateArn.
+  AcmCertificateArn:
+    Type: String
+    Default: ""
+    Description: ACM certificate ARN in us-east-1 for CustomDomainName.
+
+Conditions:
+  HasCustomDomain: !Not [!Equals [!Ref CustomDomainName, ""]]
+  HasCertificate: !Not [!Equals [!Ref AcmCertificateArn, ""]]
+
+Resources:
+  # Private bucket. All public access is blocked; the only read path is the
+  # CloudFront OAC, the only write path is the API task role.
+  ImagesBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref BucketName
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: TransitionToStandardIa
+            Status: Enabled
+            Transitions:
+              - StorageClass: STANDARD_IA
+                TransitionInDays: 30
+          - Id: AbortIncompleteMultipartUploads
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 7
+      Tags:
+        - Key: swapify:env
+          Value: !Ref EnvName
+        - Key: swapify:service
+          Value: images
+
+  # CloudFront's private read identity (replaces the legacy OAI approach).
+  ImagesOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub "swapify-images-oac-${EnvName}"
+        Description: "CloudFront read-only access to the Swapify image bucket"
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  # Immutable caching: object keys are server-generated UUIDs that are never
+  # overwritten, so a one-year cache TTL is safe and cuts repeat egress.
+  ImagesCachePolicy:
+    Type: AWS::CloudFront::CachePolicy
+    Properties:
+      CachePolicyConfig:
+        Name: !Sub "swapify-images-cache-${EnvName}"
+        Comment: "Immutable UUID-based image object keys"
+        DefaultTTL: 31536000
+        MinTTL: 31536000
+        MaxTTL: 31536000
+        ParametersInCacheKeyAndForwardedToOrigin:
+          EnableAcceptEncodingGzip: true
+          EnableAcceptEncodingBrotli: true
+          HeadersConfig:
+            HeaderBehavior: none
+          CookiesConfig:
+            CookieBehavior: none
+          QueryStringsConfig:
+            QueryStringBehavior: none
+
+  ImagesDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        HttpVersion: http2and3
+        PriceClass: !Ref CloudFrontPriceClass
+        Origins:
+          - Id: SwapifyImagesOrigin
+            DomainName: !GetAtt ImagesBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt ImagesOAC.Id
+            S3OriginConfig: {}
+        DefaultCacheBehavior:
+          TargetOriginId: SwapifyImagesOrigin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          CachedMethods:
+            - GET
+            - HEAD
+          Compress: true
+          CachePolicyId: !Ref ImagesCachePolicy
+        Aliases: !If
+          - HasCustomDomain
+          - - !Ref CustomDomainName
+          - !Ref "AWS::NoValue"
+        ViewerCertificate: !If
+          - HasCertificate
+          - AcmCertificateArn: !Ref AcmCertificateArn
+            SslSupportMethod: sni-only
+            MinimumProtocolVersion: TLSv1.2_2021
+          - CloudFrontDefaultCertificate: true
+
+  # Grants ONLY the CloudFront distribution s3:GetObject access to objects.
+  # Scoped to the distribution ARN, so no other principal can read the bucket.
+  ImagesBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ImagesBucket
+      PolicyDocument:
+        Statement:
+          - Sid: AllowCloudFrontReadOnly
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub "${ImagesBucket.Arn}/${S3Prefix}/*"
+            Condition:
+              StringEquals:
+                "AWS:SourceArn": !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${ImagesDistribution}"
+
+  # Least-privilege write access for the API task role (attached in ecs.yml).
+  ApiStorageAccessPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "swapify-images-api-${EnvName}"
+      Description: "Allow the Swapify API to write and delete listing images"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: PutAndDeleteImages
+            Effect: Allow
+            Action:
+              - s3:PutObject
+              - s3:DeleteObject
+            Resource: !Sub "${ImagesBucket.Arn}/${S3Prefix}/*"
+
+Outputs:
+  ImagesBucket:
+    Value: !Ref ImagesBucket
+  ImagesBucketArn:
+    Value: !GetAtt ImagesBucket.Arn
+  CloudFrontDistributionId:
+    Value: !Ref ImagesDistribution
+  CloudFrontDomainName:
+    Value: !GetAtt ImagesDistribution.DomainName
+  CdnBaseUrl:
+    Value: !Sub "https://${ImagesDistribution.DomainName}"
+  ApiStorageAccessPolicyArn:
+    Value: !Ref ApiStorageAccessPolicy

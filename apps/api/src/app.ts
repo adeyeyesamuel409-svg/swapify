@@ -19,7 +19,7 @@ import { notificationRoutes } from './routes/notifications.js';
 import { adminRoutes } from './routes/admin.js';
 import { uploadRoutes } from './routes/uploads.js';
 import { HttpError } from './services/swaps.js';
-import { MAX_IMAGE_BYTES, resolveUploadDir } from './services/storage.js';
+import { MAX_IMAGE_BYTES, isLocalStorage, resolveUploadDir } from './services/storage.js';
 import authPlugin from './plugins/auth.js';
 import { mkdir } from 'node:fs/promises';
 
@@ -43,16 +43,19 @@ export async function buildApp(): Promise<FastifyInstance> {
     limits: { fileSize: MAX_IMAGE_BYTES, files: 8 },
   });
 
-  // Serve uploaded listing images. The upload dir lives outside src/ and is
-  // git-ignored; its location can be overridden with UPLOAD_DIR.
-  const uploadDir = resolveUploadDir();
-  await mkdir(uploadDir, { recursive: true });
-  await app.register(fastifyStatic, {
-    root: uploadDir,
-    prefix: '/uploads/',
-    maxAge: '7d',
-    decorateReply: false,
-  });
+  // Serve uploaded listing images from local disk. Only needed for the local
+  // storage driver; in production the CloudFront distribution serves objects
+  // directly from S3.
+  if (isLocalStorage()) {
+    const uploadDir = resolveUploadDir();
+    await mkdir(uploadDir, { recursive: true });
+    await app.register(fastifyStatic, {
+      root: uploadDir,
+      prefix: '/uploads/',
+      maxAge: '7d',
+      decorateReply: false,
+    });
+  }
 
   // The web app runs on a different origin (localhost:3000) than the API
   // (localhost:4000), and authenticated calls send an Authorization header,

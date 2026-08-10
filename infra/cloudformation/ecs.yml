@@ -1,0 +1,463 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Swapify - ECS Fargate services for the API and web app behind an Application Load Balancer"
+
+Parameters:
+  EnvName:
+    Type: String
+    Default: prod
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  LoadBalancerSubnets:
+    Type: List<AWS::EC2::Subnet::Id>
+  ApiSubnets:
+    Type: List<AWS::EC2::Subnet::Id>
+  WebSubnets:
+    Type: List<AWS::EC2::Subnet::Id>
+  ApiImage:
+    Type: String
+    Description: ECR image URI for the API (build with npm run build -w @swapify/api; NODE_ENV=production).
+  WebImage:
+    Type: String
+    Description: ECR image URI for the web app (build with NEXT_PUBLIC_IMAGE_BASE_URL set to the CDN base URL).
+  ApiDomainName:
+    Type: String
+    Description: Public host for the API, e.g. api.swapify.app
+  WebDomainName:
+    Type: String
+    Description: Public host for the web app, e.g. swapify.app
+  CertificateArn:
+    Type: String
+    Description: ACM certificate ARN covering ApiDomainName and WebDomainName.
+  ApiDesiredCount:
+    Type: Number
+    Default: 1
+  WebDesiredCount:
+    Type: Number
+    Default: 1
+  ApiCpu:
+    Type: String
+    Default: "256"
+  ApiMemory:
+    Type: String
+    Default: "512"
+  WebCpu:
+    Type: String
+    Default: "1024"
+  WebMemory:
+    Type: String
+    Default: "2048"
+  CognitoRegion:
+    Type: String
+    Default: us-east-1
+  CognitoUserPoolId:
+    Type: String
+  CognitoClientId:
+    Type: String
+  CognitoIssuer:
+    Type: String
+    Description: https://cognito-idp.<region>.amazonaws.com/<user-pool-id>
+  S3Bucket:
+    Type: String
+  S3Prefix:
+    Type: String
+    Default: uploads
+  CdnBaseUrl:
+    Type: String
+    Description: CloudFront base URL from the storage stack output.
+  StorageAccessPolicyArn:
+    Type: String
+    Description: ApiStorageAccessPolicyArn from the storage stack.
+  DatabaseUrlSecretArn:
+    Type: String
+  StripeSecretKeySecretArn:
+    Type: String
+  StripeWebhookSecretSecretArn:
+    Type: String
+  NextAuthSecretSecretArn:
+    Type: String
+  CognitoClientSecretSecretArn:
+    Type: String
+
+Resources:
+  # --- Networking -----------------------------------------------------------
+  ApiSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Swapify API service
+      VpcId: !Ref VpcId
+  WebSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Swapify web service
+      VpcId: !Ref VpcId
+  LoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Swapify load balancer
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+  ApiIngressFromAlb:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref ApiSecurityGroup
+      IpProtocol: tcp
+      FromPort: 4000
+      ToPort: 4000
+      SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
+  WebIngressFromAlb:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref WebSecurityGroup
+      IpProtocol: tcp
+      FromPort: 3000
+      ToPort: 3000
+      SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
+
+  # --- IAM ------------------------------------------------------------------
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Policies:
+        - PolicyName: ReadTaskSecrets
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource:
+                  - !Ref DatabaseUrlSecretArn
+                  - !Ref StripeSecretKeySecretArn
+                  - !Ref StripeWebhookSecretSecretArn
+                  - !Ref NextAuthSecretSecretArn
+                  - !Ref CognitoClientSecretSecretArn
+
+  ApiTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref StorageAccessPolicyArn
+      Policies:
+        - PolicyName: ReadApiSecrets
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource:
+                  - !Ref DatabaseUrlSecretArn
+                  - !Ref StripeSecretKeySecretArn
+                  - !Ref StripeWebhookSecretSecretArn
+
+  WebTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ReadWebSecrets
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource:
+                  - !Ref NextAuthSecretSecretArn
+                  - !Ref CognitoClientSecretSecretArn
+
+  # --- Cluster + tasks ------------------------------------------------------
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub "swapify-${EnvName}"
+      CapacityProviders:
+        - FARGATE
+      DefaultCapacityProviderStrategy:
+        - CapacityProvider: FARGATE
+          Weight: 1
+
+  ApiTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "swapify-api-${EnvName}"
+      RequiresCompatibilities: [FARGATE]
+      NetworkMode: awsvpc
+      Cpu: !Ref ApiCpu
+      Memory: !Ref ApiMemory
+      ExecutionRoleArn: !Ref ExecutionRole
+      TaskRoleArn: !Ref ApiTaskRole
+      ContainerDefinitions:
+        - Name: api
+          Image: !Ref ApiImage
+          Essential: true
+          Cpu: 0
+          Environment:
+            - Name: NODE_ENV
+              Value: production
+            - Name: PORT
+              Value: "4000"
+            - Name: HOST
+              Value: 0.0.0.0
+            - Name: LOG_LEVEL
+              Value: info
+            - Name: AWS_REGION
+              Value: !Ref CognitoRegion
+            - Name: COGNITO_REGION
+              Value: !Ref CognitoRegion
+            - Name: COGNITO_USER_POOL_ID
+              Value: !Ref CognitoUserPoolId
+            - Name: COGNITO_CLIENT_ID
+              Value: !Ref CognitoClientId
+            - Name: WEB_BASE_URL
+              Value: !Sub "https://${WebDomainName}"
+            - Name: STORAGE_DRIVER
+              Value: s3
+            - Name: S3_BUCKET
+              Value: !Ref S3Bucket
+            - Name: S3_PREFIX
+              Value: !Ref S3Prefix
+            - Name: CDN_BASE_URL
+              Value: !Ref CdnBaseUrl
+          Secrets:
+            - Name: DATABASE_URL
+              ValueFrom: !Ref DatabaseUrlSecretArn
+            - Name: STRIPE_SECRET_KEY
+              ValueFrom: !Ref StripeSecretKeySecretArn
+            - Name: STRIPE_WEBHOOK_SECRET
+              ValueFrom: !Ref StripeWebhookSecretSecretArn
+          PortMappings:
+            - ContainerPort: 4000
+              Protocol: tcp
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref ApiLogGroup
+              awslogs-region: !Ref "AWS::Region"
+              awslogs-stream-prefix: api
+
+  WebTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "swapify-web-${EnvName}"
+      RequiresCompatibilities: [FARGATE]
+      NetworkMode: awsvpc
+      Cpu: !Ref WebCpu
+      Memory: !Ref WebMemory
+      ExecutionRoleArn: !Ref ExecutionRole
+      TaskRoleArn: !Ref WebTaskRole
+      ContainerDefinitions:
+        - Name: web
+          Image: !Ref WebImage
+          Essential: true
+          Cpu: 0
+          Environment:
+            - Name: NODE_ENV
+              Value: production
+            - Name: NEXTAUTH_URL
+              Value: !Sub "https://${WebDomainName}"
+            - Name: COGNITO_CLIENT_ID
+              Value: !Ref CognitoClientId
+            - Name: COGNITO_ISSUER
+              Value: !Ref CognitoIssuer
+            - Name: API_URL
+              Value: !Sub "https://${ApiDomainName}"
+          Secrets:
+            - Name: NEXTAUTH_SECRET
+              ValueFrom: !Ref NextAuthSecretSecretArn
+            - Name: COGNITO_CLIENT_SECRET
+              ValueFrom: !Ref CognitoClientSecretSecretArn
+          PortMappings:
+            - ContainerPort: 3000
+              Protocol: tcp
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref WebLogGroup
+              awslogs-region: !Ref "AWS::Region"
+              awslogs-stream-prefix: web
+
+  ApiService:
+    Type: AWS::ECS::Service
+    DependsOn: ApiListenerRule
+    Properties:
+      Cluster: !Ref Cluster
+      ServiceName: !Sub "swapify-api-${EnvName}"
+      TaskDefinition: !Ref ApiTaskDefinition
+      DesiredCount: !Ref ApiDesiredCount
+      LaunchType: FARGATE
+      HealthCheckGracePeriodSeconds: 60
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          SecurityGroups: [!Ref ApiSecurityGroup]
+          Subnets: !Ref ApiSubnets
+      LoadBalancers:
+        - ContainerName: api
+          ContainerPort: 4000
+          TargetGroupArn: !Ref ApiTargetGroup
+
+  WebService:
+    Type: AWS::ECS::Service
+    DependsOn: WebListenerRule
+    Properties:
+      Cluster: !Ref Cluster
+      ServiceName: !Sub "swapify-web-${EnvName}"
+      TaskDefinition: !Ref WebTaskDefinition
+      DesiredCount: !Ref WebDesiredCount
+      LaunchType: FARGATE
+      HealthCheckGracePeriodSeconds: 60
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          SecurityGroups: [!Ref WebSecurityGroup]
+          Subnets: !Ref WebSubnets
+      LoadBalancers:
+        - ContainerName: web
+          ContainerPort: 3000
+          TargetGroupArn: !Ref WebTargetGroup
+
+  # --- Load balancer --------------------------------------------------------
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub "swapify-alb-${EnvName}"
+      Type: application
+      Scheme: internet-facing
+      SecurityGroups: [!Ref LoadBalancerSecurityGroup]
+      Subnets: !Ref LoadBalancerSubnets
+
+  ApiTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub "swapify-api-tg-${EnvName}"
+      VpcId: !Ref VpcId
+      Port: 4000
+      Protocol: HTTP
+      TargetType: ip
+      HealthCheckEnabled: true
+      HealthCheckPath: /health
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 3
+      UnhealthyThresholdCount: 3
+      Matcher:
+        HttpCode: "200"
+
+  WebTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub "swapify-web-tg-${EnvName}"
+      VpcId: !Ref VpcId
+      Port: 3000
+      Protocol: HTTP
+      TargetType: ip
+      HealthCheckEnabled: true
+      HealthCheckPath: /
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 3
+      UnhealthyThresholdCount: 3
+      Matcher:
+        HttpCode: "200"
+
+  HttpsListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      Certificates:
+        - CertificateArn: !Ref CertificateArn
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref WebTargetGroup
+
+  HttpListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: redirect
+          RedirectConfig:
+            Protocol: HTTPS
+            Port: "443"
+            StatusCode: HTTP_301
+
+  ApiListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      ListenerArn: !Ref HttpsListener
+      Priority: 10
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref ApiTargetGroup
+      Conditions:
+        - Field: host-header
+          HostHeaderConfig:
+            Values: [!Ref ApiDomainName]
+
+  WebListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      ListenerArn: !Ref HttpsListener
+      Priority: 20
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref WebTargetGroup
+      Conditions:
+        - Field: host-header
+          HostHeaderConfig:
+            Values: [!Ref WebDomainName]
+
+  # --- Logging --------------------------------------------------------------
+  ApiLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/ecs/swapify/${EnvName}/api"
+      RetentionInDays: 30
+  WebLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/ecs/swapify/${EnvName}/web"
+      RetentionInDays: 30
+
+Outputs:
+  LoadBalancerDnsName:
+    Value: !GetAtt LoadBalancer.DNSName
+  ApiDomain:
+    Value: !Ref ApiDomainName
+  WebDomain:
+    Value: !Ref WebDomainName

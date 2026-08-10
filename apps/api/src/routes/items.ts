@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { Category, Condition, ItemStatus, prisma } from '@swapify/db';
 import { tokensToMicroTokens } from '@swapify/shared';
+import { deleteImage, StorageError } from '../services/storage.js';
 
 const categoryValues = Object.values(Category);
 const conditionValues = Object.values(Condition);
@@ -198,6 +199,10 @@ const itemsRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
       return reply.code(404).send({ error: 'Item not found' });
     }
 
+    const previousImages = body.images !== undefined
+      ? await prisma.itemImage.findMany({ where: { itemId: id }, select: { url: true } })
+      : [];
+
     const item = await prisma.$transaction(async (tx) => {
       let updated = await tx.item.update({
         where: { id },
@@ -229,6 +234,23 @@ const itemsRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
 
       return updated;
     });
+
+    // After the DB transaction commits, remove objects for replaced images.
+    // Only managed upload keys are touched; external/absolute URLs are left alone.
+    const newUrls = new Set(body.images ?? []);
+    const removed = previousImages
+      .map((img) => img.url)
+      .filter((url) => url.startsWith('uploads/') && !newUrls.has(url));
+
+    for (const key of removed) {
+      deleteImage(key).catch((err) => {
+        if (err instanceof StorageError) {
+          request.log.warn({ err, key }, 'Failed to delete replaced image object');
+        } else {
+          request.log.error({ err, key }, 'Failed to delete replaced image object');
+        }
+      });
+    }
 
     return { item };
   });

@@ -1,5 +1,10 @@
 const API_URL = process.env.API_URL ?? "http://localhost:4000";
 
+// Public base used to resolve relative image keys (uploads/<uuid>.<ext>).
+// Local development falls back to the API (which serves the files). In
+// production point this at the CloudFront distribution (see .env.example).
+const IMAGE_BASE_URL = process.env.NEXT_PUBLIC_IMAGE_BASE_URL ?? API_URL;
+
 export type ApiUser = {
   id: string;
   email: string;
@@ -43,12 +48,14 @@ export async function apiFetch<T>(path: string, accessToken?: string): Promise<T
   return res.json() as Promise<T>;
 }
 
-// Listing images are stored as either external absolute URLs (legacy listings)
-// or relative public paths (/uploads/<file>) produced by the upload pipeline.
-// Relative paths are resolved against the configured API base URL so the same
-// database value works in dev and production.
+// Listing images are stored as portable relative object keys (uploads/<file>)
+// produced by the upload pipeline, or absolute external URLs (legacy
+// listings). Relative keys are resolved against the configured image base so
+// the same database value works in dev (API origin) and production (CDN).
 export function resolveImageUrl(url: string): string {
-  return url.startsWith("/") ? `${API_URL}${url}` : url;
+  if (!url) return url;
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(url)) return url;
+  return `${IMAGE_BASE_URL}${url.startsWith("/") ? url : `/${url}`}`;
 }
 
 // Upload images as multipart. Returns relative URLs to attach to an item.

@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { prisma } from '@swapify/db';
-import { creditTokenOrder, parseWebhookEvent, stripeEnabled } from '../services/stripe.js';
+import { creditTokenOrder, parseWebhookEvent, simulationAllowed } from '../services/stripe.js';
 
 const stripeRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
   // Stripe's canonical source of truth for completed payments.
@@ -43,9 +43,10 @@ const stripeRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
     return reply.code(200).send({ received: true });
   });
 
-  // Local-dev checkout flow: without a Stripe key, the "buy" button points
-  // here instead of Stripe, so the full purchase flow is still testable.
-  if (!stripeEnabled) {
+  // Local-dev checkout flow: without a Stripe key outside production, the
+  // "buy" button points here instead of Stripe, so the full purchase flow is
+  // still testable. Never registered in production.
+  if (simulationAllowed) {
     app.get('/stripe/dev-confirm/:orderId', async (request, reply) => {
       const { orderId } = request.params as { orderId: string };
 

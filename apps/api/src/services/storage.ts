@@ -1,15 +1,16 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, unlink, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 
-// Upload pipeline storage backend. The rest of the app only talks to this
-// module, so swapping local disk for S3 later (e.g. a storeImage that PUTs to
-// a bucket and returns the object's public key) won't touch the database or
-// the route handlers.
+// Upload pipeline storage backend. The rest of the app only talks to the
+// active StorageProvider, so swapping local disk for S3 (or back again) never
+// touches the database or the route handlers.
 //
-// Stored values are RELATIVE public paths (/uploads/<file>) so the database
-// stays portable between environments; clients resolve them against their API
-// base URL.
+// Stored values are RELATIVE object keys ("uploads/<uuid>.<ext>") so the
+// database stays portable between environments; clients resolve them against a
+// configurable public base URL (API_URL in dev, the CloudFront distribution in
+// production).
 
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 export const MAX_IMAGES_PER_UPLOAD = 8;
@@ -17,6 +18,18 @@ export const MAX_IMAGES_PER_UPLOAD = 8;
 export type DetectedImage = { mime: string; ext: string };
 
 export class StorageError extends Error {}
+
+export type StorageProvider = {
+  storeImage(buffer: Buffer): Promise<string>;
+  deleteImage(key: string): Promise<void>;
+  getImageUrl(key: string): string;
+};
+
+const DEFAULT_PREFIX = 'uploads';
+
+export function objectKeyFor(filename: string): string {
+  return `${process.env.S3_PREFIX ?? DEFAULT_PREFIX}/${filename}`;
+}
 
 // Sniff the real file type from magic bytes instead of trusting the client's
 // content-type. Prevents non-image payloads from being stored.
@@ -62,31 +75,130 @@ export function sniffImage(buffer: Buffer): DetectedImage | null {
   return null;
 }
 
+// ---------------------------------------------------------------------------
+// Local filesystem provider (development default)
+// ---------------------------------------------------------------------------
+
 export function resolveUploadDir(): string {
   return resolve(process.env.UPLOAD_DIR ?? 'uploads');
 }
 
-export function publicUrlFor(filename: string): string {
-  return `/uploads/${filename}`;
+export class LocalStorageProvider implements StorageProvider {
+  async storeImage(buffer: Buffer): Promise<string> {
+    const detected = sniffImage(buffer);
+    if (!detected) {
+      throw new StorageError('Unsupported file type - only JPEG, PNG, GIF, WebP and AVIF images are allowed');
+    }
+    if (buffer.length > MAX_IMAGE_BYTES) {
+      throw new StorageError('Image exceeds the 5 MB size limit');
+    }
+
+    const dir = resolveUploadDir();
+    await mkdir(dir, { recursive: true });
+
+    const filename = `${randomUUID()}${detected.ext}`;
+    await writeFile(join(dir, filename), buffer, { flag: 'wx' });
+
+    return objectKeyFor(filename);
+  }
+
+  async deleteImage(key: string): Promise<void> {
+    const filename = key.split('/').pop();
+    if (!filename) return;
+    try {
+      await unlink(join(resolveUploadDir(), filename));
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+    }
+  }
+
+  getImageUrl(key: string): string {
+    return `/${key}`;
+  }
 }
 
-// Persist an image buffer and return its relative public URL.
-// Filenames are random UUIDs generated server-side, so no user input ever
-// reaches the filesystem path (no path traversal).
-export async function storeImage(buffer: Buffer): Promise<string> {
-  const detected = sniffImage(buffer);
-  if (!detected) {
-    throw new StorageError('Unsupported file type - only JPEG, PNG, GIF, WebP and AVIF images are allowed');
+// ---------------------------------------------------------------------------
+// AWS S3 provider (production)
+// ---------------------------------------------------------------------------
+
+export class S3StorageProvider implements StorageProvider {
+  private client: S3Client;
+
+  constructor(opts?: { client?: S3Client }) {
+    this.client = opts?.client ?? new S3Client({ region: process.env.AWS_REGION });
   }
-  if (buffer.length > MAX_IMAGE_BYTES) {
-    throw new StorageError('Image exceeds the 5 MB size limit');
+
+  get bucket(): string {
+    const bucket = process.env.S3_BUCKET;
+    if (!bucket) throw new StorageError('S3_BUCKET is not configured');
+    return bucket;
   }
 
-  const dir = resolveUploadDir();
-  await mkdir(dir, { recursive: true });
+  get cdnBaseUrl(): string {
+    const base = process.env.CDN_BASE_URL;
+    if (!base) throw new StorageError('CDN_BASE_URL is not configured');
+    return base.replace(/\/+$/, '');
+  }
 
-  const filename = `${randomUUID()}${detected.ext}`;
-  await writeFile(join(dir, filename), buffer, { flag: 'wx' });
+  async storeImage(buffer: Buffer): Promise<string> {
+    const detected = sniffImage(buffer);
+    if (!detected) {
+      throw new StorageError('Unsupported file type - only JPEG, PNG, GIF, WebP and AVIF images are allowed');
+    }
+    if (buffer.length > MAX_IMAGE_BYTES) {
+      throw new StorageError('Image exceeds the 5 MB size limit');
+    }
 
-  return publicUrlFor(filename);
+    const filename = `${randomUUID()}${detected.ext}`;
+    const key = objectKeyFor(filename);
+
+    await this.client.send(
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        Body: buffer,
+        ContentType: detected.mime,
+        ServerSideEncryption: 'AES256',
+      }),
+    );
+
+    return key;
+  }
+
+  async deleteImage(key: string): Promise<void> {
+    await this.client.send(
+      new DeleteObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+      }),
+    );
+  }
+
+  getImageUrl(key: string): string {
+    return `${this.cdnBaseUrl}/${key}`;
+  }
 }
+
+// ---------------------------------------------------------------------------
+// Provider selection
+// ---------------------------------------------------------------------------
+
+const driver = process.env.STORAGE_DRIVER ?? 'local';
+
+let activeStorage: StorageProvider | null = null;
+
+export function getStorage(): StorageProvider {
+  if (!activeStorage) {
+    activeStorage = driver === 's3' ? new S3StorageProvider() : new LocalStorageProvider();
+  }
+  return activeStorage;
+}
+
+export function isLocalStorage(): boolean {
+  return driver !== 's3';
+}
+
+// Backwards-compatible named exports used by route handlers.
+export const storeImage = (buffer: Buffer): Promise<string> => getStorage().storeImage(buffer);
+export const deleteImage = (key: string): Promise<void> => getStorage().deleteImage(key);
+export const getImageUrl = (key: string): string => getStorage().getImageUrl(key);

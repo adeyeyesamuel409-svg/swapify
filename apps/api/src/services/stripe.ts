@@ -2,8 +2,14 @@ import Stripe from 'stripe';
 import { TokenOrderStatus, TransactionDirection, TransactionType, prisma } from '@swapify/db';
 import { TokenTier } from '@swapify/shared';
 import { applyLedgerEntry } from './ledger.js';
+import { HttpError } from './swaps.js';
 
+// The simulated checkout is a development convenience ONLY. In production a
+// missing Stripe key must never silently credit tokens, so simulation is only
+// allowed outside NODE_ENV=production.
+export const isProduction = process.env.NODE_ENV === 'production';
 export const stripeEnabled = Boolean(process.env.STRIPE_SECRET_KEY);
+export const simulationAllowed = !stripeEnabled && !isProduction;
 
 let stripeClient: Stripe | null = null;
 
@@ -19,8 +25,9 @@ export type CheckoutResult =
   | { simulated: false; url: string; sessionId: string };
 
 // Creates a Stripe Checkout session for a token tier. Without a configured
-// Stripe key (local dev), returns a simulated checkout URL instead so the
-// whole flow stays testable.
+// Stripe key outside production, returns a simulated checkout URL instead so
+// the whole flow stays testable. In production a missing key is a
+// configuration error and throws (never a simulated payment).
 export async function createCheckout(
   tier: TokenTier,
   orderId: string,
@@ -29,6 +36,9 @@ export async function createCheckout(
   cancelUrl: string,
 ): Promise<CheckoutResult> {
   if (!stripeEnabled) {
+    if (!simulationAllowed) {
+      throw new HttpError(503, 'Payments are not configured on this server');
+    }
     return { simulated: true, url: `/stripe/dev-confirm/${orderId}`, sessionId: null };
   }
 
