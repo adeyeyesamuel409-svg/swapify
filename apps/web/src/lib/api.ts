@@ -5,13 +5,17 @@ const API_URL = process.env.API_URL ?? "http://localhost:4000";
 // production point this at the CloudFront distribution (see .env.example).
 const IMAGE_BASE_URL = process.env.NEXT_PUBLIC_IMAGE_BASE_URL ?? API_URL;
 
+// All money is integer GBP pence; format as £X.XX for display.
+export function formatPence(pence: number): string {
+  return `£${(pence / 100).toFixed(2)}`;
+}
+
 export type ApiUser = {
   id: string;
   email: string;
   name: string;
   bio: string | null;
   imageUrl: string | null;
-  wallet: { balanceMicroTokens: string } | null;
   admin: { role: string } | null;
 };
 
@@ -21,7 +25,7 @@ export type ApiItem = {
   description: string;
   category: string;
   condition: string;
-  valueMicroTokens: string;
+  valuePence: number;
   status: string;
   createdAt: string;
   images: { id: string; url: string }[];
@@ -79,30 +83,6 @@ export async function uploadImages(accessToken: string, files: File[]): Promise<
   return data.files;
 }
 
-export type ApiWallet = {
-  id: string;
-  balanceMicroTokens: string;
-  version: number;
-  createdAt: string;
-};
-
-export type ApiTransaction = {
-  id: string;
-  type: string;
-  direction: string;
-  amountMicroTokens: string;
-  balanceAfterMicroTokens: string;
-  referenceId: string | null;
-  note: string | null;
-  createdAt: string;
-};
-
-export type WalletResult = { wallet: ApiWallet; transactions: ApiTransaction[] };
-
-export function fetchWallet(accessToken: string): Promise<WalletResult> {
-  return apiFetch("/wallet", accessToken);
-}
-
 export function fetchMe(accessToken: string): Promise<{ user: ApiUser }> {
   return apiFetch("/auth/me", accessToken);
 }
@@ -139,7 +119,7 @@ export async function createItem(
     description: string;
     category: string;
     condition: string;
-    valueTokens: number;
+    valuePence: number;
     images: string[];
   },
 ): Promise<{ item: ApiItem }> {
@@ -158,8 +138,8 @@ export async function createItem(
   return res.json();
 }
 
-export function itemValue(item: ApiItem): number {
-  return Number(BigInt(item.valueMicroTokens)) / 1_000_000;
+export function itemValuePence(item: ApiItem): number {
+  return item.valuePence;
 }
 
 export function timeAgo(dateValue: string): string {
@@ -185,7 +165,7 @@ export function timeAgo(dateValue: string): string {
 export type ApiSwap = {
   id: string;
   status: string;
-  gapMicroTokens: string;
+  gapPence: number;
   gapPayer: string;
   offeringUserId: string;
   requestedUserId: string;
@@ -198,14 +178,13 @@ export type ApiSwap = {
   requestedItem: ApiItem;
   offeringUser: { id: string; name: string; imageUrl: string | null };
   requestedUser: { id: string; name: string; imageUrl: string | null };
-  escrow: {
+  payment: {
     id: string;
     status: string;
-    amountMicroTokens: string;
-    walletId: string;
-    heldAt: string;
-    releasedAt: string | null;
-    refundedAt: string | null;
+    amountPence: number;
+    feePence: number;
+    totalPence: number;
+    paidAt: string | null;
   } | null;
 };
 
@@ -260,12 +239,23 @@ export function cancelSwap(accessToken: string, swapId: string): Promise<{ swap:
   return apiSend(`/swaps/${swapId}/cancel`, accessToken, "POST") as Promise<{ swap: ApiSwap }>;
 }
 
-export function fundSwap(accessToken: string, swapId: string): Promise<{ swap: ApiSwap }> {
-  return apiSend(`/swaps/${swapId}/fund`, accessToken, "POST") as Promise<{ swap: ApiSwap }>;
+// Starts the gap payment. Returns the checkout URL to navigate to (Stripe
+// Checkout in production, the API's simulated dev-confirm flow otherwise).
+export function paySwap(
+  accessToken: string,
+  swapId: string,
+): Promise<{ swap: ApiSwap; checkoutUrl: string }> {
+  return apiSend(`/swaps/${swapId}/pay`, accessToken, "POST") as Promise<{ swap: ApiSwap; checkoutUrl: string }>;
 }
 
 export function confirmSwap(accessToken: string, swapId: string): Promise<{ swap: ApiSwap }> {
   return apiSend(`/swaps/${swapId}/confirm`, accessToken, "POST") as Promise<{ swap: ApiSwap }>;
+}
+
+// Soft-deletes the caller's listing. Rejected with 409 while the item is part
+// of an in-progress swap.
+export function deleteItem(accessToken: string, itemId: string): Promise<{ item: ApiItem }> {
+  return apiSend(`/items/${itemId}`, accessToken, "DELETE") as Promise<{ item: ApiItem }>;
 }
 
 // --- Chat ---------------------------------------------------------------
@@ -337,7 +327,7 @@ export type ApiWishlist = {
   title: string;
   description: string | null;
   category: string | null;
-  maxValueMicroTokens: string | null;
+  maxValuePence: number | null;
   createdAt: string;
 };
 
@@ -347,7 +337,7 @@ export function fetchWishlists(accessToken: string): Promise<{ wishlists: ApiWis
 
 export function createWishlist(
   accessToken: string,
-  input: { title: string; description?: string; category?: string; maxValueTokens?: number },
+  input: { title: string; description?: string; category?: string; maxValuePence?: number },
 ): Promise<{ wishlist: ApiWishlist }> {
   return apiSend("/wishlists", accessToken, "POST", input) as Promise<{ wishlist: ApiWishlist }>;
 }
@@ -397,7 +387,8 @@ export type AdminStats = {
   items: number;
   swaps: number;
   activeSwaps: number;
-  escrowedMicroTokens: string;
+  paidSwaps: number;
+  totalFeesPence: number;
 };
 
 export type AdminUser = {
@@ -406,8 +397,7 @@ export type AdminUser = {
   email: string;
   createdAt: string;
   admin: { role: string } | null;
-  wallet: { balanceMicroTokens: string } | null;
-  _count: { items: number; swapsOffered: number; swapsRequested: number };
+  _count: { items: number; swapsOffered: number; swapsRequested: number; paymentsMade: number };
 };
 
 export function fetchAdminStats(accessToken: string): Promise<{ stats: AdminStats }> {
@@ -430,47 +420,6 @@ export function setItemStatus(
   return apiSend(`/admin/items/${itemId}/status`, accessToken, "POST", { status }) as Promise<{ item: ApiItem }>;
 }
 
-export function creditUserTokens(
-  accessToken: string,
-  userId: string,
-  input: { tokens: number; note?: string },
-): Promise<unknown> {
-  return apiSend(`/admin/users/${userId}/credit`, accessToken, "POST", input);
-}
-
 export function fetchMyItems(accessToken: string): Promise<ListItemsResult> {
   return apiFetch("/items/me", accessToken);
-}
-
-export type ApiTokenOrder = {
-  id: string;
-  tierId: string;
-  tokens: string;
-  priceCents: number;
-  status: string;
-  createdAt: string;
-  paidAt: string | null;
-};
-
-export function fetchTokenOrders(accessToken: string): Promise<{ orders: ApiTokenOrder[] }> {
-  return apiFetch("/token-orders", accessToken);
-}
-
-export async function createCheckoutSession(
-  accessToken: string,
-  input: { tierId: string; successUrl: string; cancelUrl: string },
-): Promise<{ url: string; simulated: boolean; order: ApiTokenOrder }> {
-  const res = await fetch(`${API_URL}/token-orders/checkout`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-    cache: "no-store",
-  });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => null);
-    throw new Error(err?.error ?? `API ${res.status}`);
-  }
-
-  return res.json();
 }

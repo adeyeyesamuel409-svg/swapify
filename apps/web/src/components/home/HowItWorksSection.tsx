@@ -1,4 +1,4 @@
-import { Coins, PackagePlus, Repeat, Search } from "lucide-react";
+import { CreditCard, PackagePlus, Repeat, Search } from "lucide-react";
 import SectionHeader from "../SectionHeader";
 
 const STEPS = [
@@ -6,7 +6,7 @@ const STEPS = [
     icon: PackagePlus,
     step: "01",
     title: "List what you have",
-    body: "Snap a photo, add a short description, and we estimate a fair token value for your item.",
+    body: "Snap a photo, add a short description, and set a fair cash value for your item.",
   },
   {
     icon: Search,
@@ -18,13 +18,13 @@ const STEPS = [
     icon: Repeat,
     step: "03",
     title: "Agree on a swap",
-    body: "Propose a trade. When both sides accept, your tokens are locked in escrow so no one gets left out.",
+    body: "Propose a trade. When both sides accept, the value-gap payment is held securely until both confirm receipt.",
   },
   {
-    icon: Coins,
+    icon: CreditCard,
     step: "04",
-    title: "Tokens balance the gap",
-    body: "Values rarely match exactly. Tokens cover the difference, so every swap stays fair and simple.",
+    title: "Pay the difference",
+    body: "Values rarely match exactly. The gap is settled with a secure card payment, so every swap stays fair and simple.",
   },
 ];
 
@@ -34,8 +34,8 @@ export default function HowItWorksSection() {
       <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
         <SectionHeader
           eyebrow="How it works"
-          title="A marketplace built around trading, not cash"
-          description="Four simple steps from clutter to treasure. No checkout needed — just fair, protected swaps."
+          title="A marketplace built around trading"
+          description="Four simple steps from clutter to treasure. No haggling — just fair, protected swaps."
         />
         <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {STEPS.map(({ icon: Icon, step, title, body }) => (

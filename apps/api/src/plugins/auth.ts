@@ -1,15 +1,9 @@
 import fp from 'fastify-plugin';
 import { FastifyInstance, FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import { createRemoteJWKSet, jwtVerify, JWTPayload } from 'jose';
-import { prisma, Admin, TransactionDirection, TransactionType, User, Wallet } from '@swapify/db';
-import {
-  applyLedgerEntry,
-  MICRO_TOKENS_PER_TOKEN,
-  WELCOME_BONUS_TOKENS,
-} from '../services/ledger.js';
+import { prisma, Admin, User } from '@swapify/db';
 
 export interface AuthenticatedUser extends User {
-  wallet: Wallet | null;
   admin: Admin | null;
 }
 
@@ -29,7 +23,7 @@ const clientId = process.env.COGNITO_CLIENT_ID;
 const issuer = `https://cognito-idp.${region}.amazonaws.com/${userPoolId}`;
 const jwks = createRemoteJWKSet(new URL(`${issuer}/.well-known/jwks.json`));
 
-// A user's first authenticated request creates their local record + wallet.
+// A user's first authenticated request creates their local record.
 // Subsequent requests just update the name/email in case they changed in Cognito.
 async function syncUserFromCognito(payload: JWTPayload): Promise<AuthenticatedUser> {
   const sub = String(payload.sub);
@@ -50,34 +44,18 @@ async function syncUserFromCognito(payload: JWTPayload): Promise<AuthenticatedUs
         ...(email && email !== existing.email ? { email } : {}),
         name,
       },
-      include: { wallet: true, admin: true },
+      include: { admin: true },
     });
   }
 
-  // No local record yet - create user + wallet, then grant the welcome bonus.
-  // The idempotency key guarantees the bonus is only ever granted once.
-  const created = await prisma.user.create({
+  // No local record yet - create user.
+  return prisma.user.create({
     data: {
       cognitoSub: sub,
       email: email ?? `${sub}@cognito.invalid`,
       name,
-      wallet: { create: {} },
     },
-    include: { wallet: true },
-  });
-
-  await applyLedgerEntry({
-    walletId: created.wallet!.id,
-    type: TransactionType.EARN,
-    direction: TransactionDirection.CREDIT,
-    amountMicroTokens: WELCOME_BONUS_TOKENS * MICRO_TOKENS_PER_TOKEN,
-    note: 'Welcome bonus',
-    idempotencyKey: `welcome:${sub}`,
-  });
-
-  return prisma.user.findUniqueOrThrow({
-    where: { id: created.id },
-    include: { wallet: true, admin: true },
+    include: { admin: true },
   });
 }
 

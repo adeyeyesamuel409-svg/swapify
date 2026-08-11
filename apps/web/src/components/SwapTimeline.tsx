@@ -15,19 +15,21 @@ type Step = {
 const TERMINAL = new Set(["CANCELLED", "EXPIRED"]);
 
 export default function SwapTimeline({ swap, myUserId }: Props) {
-  const gap = Number(BigInt(swap.gapMicroTokens));
-  const hasEscrowStep = gap > 0;
+  const gap = swap.gapPence;
+  const hasPaymentStep = gap > 0;
 
   const steps: Step[] = [
     { key: "REQUESTED", label: "Requested", hint: "Swap request sent" },
     { key: "AGREED", label: "Agreed", hint: "Owner accepted" },
-    ...(hasEscrowStep
-      ? [{ key: "ESCROWED", label: "Tokens held", hint: "Gap secured in escrow" }]
+    ...(hasPaymentStep
+      ? [{ key: "PAID", label: "Paid", hint: "Value-gap payment received" }]
       : []),
     { key: "COMPLETED", label: "Completed", hint: "Both items received" },
   ];
 
-  const statusIndex: Record<string, number> = { REQUESTED: 0, AGREED: 1, ESCROWED: 2, COMPLETED: 3 };
+  const statusIndex: Record<string, number> = hasPaymentStep
+    ? { REQUESTED: 0, AGREED: 1, PAID: 2, SHIPPED: 2, COMPLETED: 3 }
+    : { REQUESTED: 0, AGREED: 1, PAID: 1, SHIPPED: 1, COMPLETED: 2 };
   const currentIndex = statusIndex[swap.status] ?? 0;
   const isTerminal = TERMINAL.has(swap.status);
   const isDone = swap.status === "COMPLETED";

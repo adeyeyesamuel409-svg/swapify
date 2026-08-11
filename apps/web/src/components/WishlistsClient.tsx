@@ -7,7 +7,7 @@ import { CATEGORIES, CATEGORY_LABELS } from "@swapify/shared";
 import {
   createWishlist,
   deleteWishlist,
-  itemValue,
+  formatPence,
   type ApiItem,
   type ApiWishlist,
 } from "@/lib/api";
@@ -21,7 +21,7 @@ export default function WishlistsClient({ wishlists, accessToken }: Props) {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("");
-  const [maxValueTokens, setMaxValueTokens] = useState("");
+  const [maxValuePence, setMaxValuePence] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -33,10 +33,10 @@ export default function WishlistsClient({ wishlists, accessToken }: Props) {
       await createWishlist(accessToken, {
         title: title.trim(),
         ...(category ? { category } : {}),
-        ...(maxValueTokens ? { maxValueTokens: Number(maxValueTokens) } : {}),
+        ...(maxValuePence ? { maxValuePence: Math.round(Number(maxValuePence) * 100) } : {}),
       });
       setTitle("");
-      setMaxValueTokens("");
+      setMaxValuePence("");
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save wishlist");
@@ -88,11 +88,12 @@ export default function WishlistsClient({ wishlists, accessToken }: Props) {
         </div>
         <div className="flex gap-2">
           <input
-            value={maxValueTokens}
-            onChange={(e) => setMaxValueTokens(e.target.value)}
+            value={maxValuePence}
+            onChange={(e) => setMaxValuePence(e.target.value)}
             type="number"
             min="0"
-            placeholder="Max value in tokens (optional)"
+            step="0.01"
+            placeholder="Max value in £ (optional)"
             className={`${inputClass} flex-1`}
           />
           <button
@@ -117,7 +118,7 @@ export default function WishlistsClient({ wishlists, accessToken }: Props) {
                   <p className="font-semibold text-foreground">{w.title}</p>
                   <p className="text-xs text-muted">
                     {w.category ? CATEGORY_LABELS[w.category as keyof typeof CATEGORY_LABELS] : "Any category"}
-                    {w.maxValueMicroTokens ? ` · max ${Number(BigInt(w.maxValueMicroTokens)) / 1_000_000} tokens` : ""}
+                    {w.maxValuePence ? ` · max ${formatPence(w.maxValuePence)}` : ""}
                   </p>
                 </div>
                 <button
@@ -141,7 +142,7 @@ export default function WishlistsClient({ wishlists, accessToken }: Props) {
                     >
                       <p className="truncate text-sm font-semibold text-primary-soft">{item.title}</p>
                       <p className="mt-1 text-xs text-muted">
-                        {itemValue(item)} tokens · {item.owner.name}
+                        {formatPence(item.valuePence)} · {item.owner.name}
                       </p>
                     </Link>
                   ))}

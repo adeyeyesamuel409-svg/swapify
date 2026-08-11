@@ -7,9 +7,7 @@ import { jsonWithBigInt } from '@swapify/db';
 import { healthRoutes } from './routes/health.js';
 import { authRoutes } from './routes/auth.js';
 import { itemsRoutes } from './routes/items.js';
-import { walletRoutes } from './routes/wallet.js';
 import { swapRoutes } from './routes/swaps.js';
-import { tokenOrderRoutes } from './routes/token-orders.js';
 import { stripeRoutes } from './routes/stripe.js';
 import { chatRoutes } from './routes/chat.js';
 import { ratingRoutes } from './routes/ratings.js';
@@ -30,8 +28,10 @@ export async function buildApp(): Promise<FastifyInstance> {
     },
   });
 
-  // Token amounts are BigInt, which JSON.stringify cannot serialize.
-  // This ensures every response serializes them as strings safely.
+  // Money is stored as integer GBP pence (Int), which JSON.stringify serializes
+  // natively. This serializer remains as a defensive safety net that turns any
+  // stray BigInt (e.g. a future Prisma aggregate) into a string instead of
+  // failing to serialize.
   app.setReplySerializer((payload: unknown) => jsonWithBigInt(payload));
 
   // Stripe webhook signature verification needs the raw request body.
@@ -95,9 +95,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   app.register(healthRoutes);
   app.register(authRoutes);
   app.register(itemsRoutes);
-  app.register(walletRoutes);
   app.register(swapRoutes);
-  app.register(tokenOrderRoutes);
   app.register(stripeRoutes);
   app.register(chatRoutes);
   app.register(ratingRoutes);

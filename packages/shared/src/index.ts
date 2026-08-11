@@ -1,14 +1,6 @@
-// One token = 1,000,000 micro-tokens. All stored amounts are integer
-// micro-tokens so we never suffer floating-point rounding on money.
-export const MICRO_TOKENS_PER_TOKEN = 1_000_000n;
-
-export function tokensToMicroTokens(tokens: number | bigint): bigint {
-  return BigInt(tokens) * MICRO_TOKENS_PER_TOKEN;
-}
-
-export function microTokensToTokens(microTokens: bigint | string): number {
-  return Number(BigInt(microTokens)) / Number(MICRO_TOKENS_PER_TOKEN);
-}
+// All money amounts are stored as integer GBP pence (1 pound = 100 pence),
+// the same way Stripe stores money in its minor units. The API never uses
+// floats for money; decimals only appear at the edge for display.
 
 // Display metadata shared by the API and web app.
 export const CATEGORIES = [
@@ -50,7 +42,7 @@ export const CONDITION_LABELS: Record<(typeof CONDITIONS)[number], string> = {
 export const SWAP_STATUS_LABELS: Record<string, string> = {
   REQUESTED: 'Requested',
   AGREED: 'Agreed',
-  ESCROWED: 'Escrowed',
+  PAID: 'Paid',
   SHIPPED: 'Shipped',
   COMPLETED: 'Completed',
   CANCELLED: 'Cancelled',
@@ -63,25 +55,20 @@ export const GAP_PAYER_LABELS: Record<string, string> = {
   NONE: 'No gap',
 };
 
-// Token purchase tiers. The API is the authority on pricing; this list only
-// drives what the UI shows and what tierId values are valid.
-export const TOKEN_TIERS = [
-  { id: 'starter', tokens: 50, priceCents: 500 },
-  { id: 'regular', tokens: 150, priceCents: 1400 },
-  { id: 'booster', tokens: 500, priceCents: 4000 },
-  { id: 'power', tokens: 1200, priceCents: 8500 },
-] as const;
+// Service fee: a flat percentage of the item being acquired, in GBP pence.
+// £50.00 item -> £2.50. Centralized so the rate can change in one place.
+export const SERVICE_FEE_RATE = 0.05;
 
-export type TokenTier = (typeof TOKEN_TIERS)[number];
+export function calculateServiceFee(itemValuePence: number): number {
+  return Math.round(itemValuePence * SERVICE_FEE_RATE);
+}
 
-export const TOKEN_TIER_LABELS: Record<string, string> = {
-  starter: 'Starter',
-  regular: 'Regular',
-  booster: 'Booster',
-  power: 'Power',
-};
+// Formats integer pence as a display string: 5250 -> "£52.50".
+export function formatPence(pence: number | bigint | string): string {
+  return `£${(Number(pence) / 100).toFixed(2)}`;
+}
 
-export const TOKEN_ORDER_STATUS_LABELS: Record<string, string> = {
+export const PAYMENT_STATUS_LABELS: Record<string, string> = {
   PENDING: 'Pending',
   PAID: 'Paid',
   FAILED: 'Failed',

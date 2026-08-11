@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { FastifyInstance } from 'fastify';
 import { buildApp } from './app.js';
-import { startEscrowSweeper } from './services/escrow.js';
+import { startSwapSweeper } from './services/sweeper.js';
 import { validateConfig } from './config.js';
 
 // Fail fast on production configuration mistakes before binding the port.
@@ -12,8 +12,8 @@ const host = process.env.HOST ?? '0.0.0.0';
 
 const app: FastifyInstance = await buildApp();
 
-// Periodically refund escrow for swaps that never completed in time.
-startEscrowSweeper();
+// Periodically expire/refund swaps that never completed in time.
+startSwapSweeper();
 
 try {
   await app.listen({ port, host });

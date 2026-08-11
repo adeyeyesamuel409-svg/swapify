@@ -1,6 +1,5 @@
 import { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { Category, ItemStatus, prisma } from '@swapify/db';
-import { tokensToMicroTokens } from '@swapify/shared';
 
 const createSchema = {
   body: {
@@ -10,7 +9,7 @@ const createSchema = {
       title: { type: 'string', minLength: 1, maxLength: 120 },
       description: { type: 'string', maxLength: 500 },
       category: { type: 'string', enum: Object.values(Category) },
-      maxValueTokens: { type: 'number', minimum: 0 },
+      maxValuePence: { type: 'integer', minimum: 0, maximum: 100_000_000 },
     },
   },
 } as const;
@@ -48,11 +47,11 @@ const wishlistRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
 
   app.post('/wishlists', { preHandler: [app.authenticate], schema: createSchema }, async (request) => {
     const user = request.user!;
-    const { title, description, category, maxValueTokens } = request.body as {
+    const { title, description, category, maxValuePence } = request.body as {
       title: string;
       description?: string;
       category?: Category;
-      maxValueTokens?: number;
+      maxValuePence?: number;
     };
 
     const wishlist = await prisma.wishlist.create({
@@ -61,10 +60,7 @@ const wishlistRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
         title,
         description: description ?? null,
         category: category ?? null,
-        maxValueMicroTokens:
-          typeof maxValueTokens === 'number' && maxValueTokens > 0
-            ? tokensToMicroTokens(maxValueTokens)
-            : null,
+        maxValuePence: maxValuePence && maxValuePence > 0 ? maxValuePence : null,
       },
     });
 
@@ -102,8 +98,8 @@ const wishlistRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
       where: {
         status: ItemStatus.ACTIVE,
         ...(wishlist.category ? { category: wishlist.category } : {}),
-        ...(wishlist.maxValueMicroTokens
-          ? { valueMicroTokens: { lte: wishlist.maxValueMicroTokens } }
+        ...(wishlist.maxValuePence
+          ? { valuePence: { lte: wishlist.maxValuePence } }
           : {}),
         OR: keywords.map((word) => ({ title: { contains: word, mode: 'insensitive' } })),
       },

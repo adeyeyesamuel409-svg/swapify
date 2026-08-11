@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { creditUserTokens, setItemStatus, type AdminUser, type ApiItem } from "@/lib/api";
+import { formatPence, setItemStatus, type AdminUser, type ApiItem } from "@/lib/api";
 import { ITEM_STATUS_LABELS } from "@swapify/shared";
 
 type Props = { accessToken: string; users: AdminUser[]; items: ApiItem[] };
@@ -10,7 +10,6 @@ type Props = { accessToken: string; users: AdminUser[]; items: ApiItem[] };
 export default function AdminActions({ accessToken, users, items }: Props) {
   const router = useRouter();
   const [error, setError] = useState("");
-  const [credit, setCredit] = useState<{ userId: string; tokens: string } | null>(null);
 
   const changeStatus = async (itemId: string, status: string) => {
     setError("");
@@ -19,18 +18,6 @@ export default function AdminActions({ accessToken, users, items }: Props) {
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to update status");
-    }
-  };
-
-  const doCredit = async () => {
-    if (!credit) return;
-    setError("");
-    try {
-      await creditUserTokens(accessToken, credit.userId, { tokens: Number(credit.tokens), note: "Admin adjustment" });
-      setCredit(null);
-      router.refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to credit tokens");
     }
   };
 
@@ -46,37 +33,10 @@ export default function AdminActions({ accessToken, users, items }: Props) {
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-foreground">{u.name}</p>
                 <p className="truncate text-xs text-muted">
-                  {u.email} · {Number(u.wallet?.balanceMicroTokens ?? "0") / 1_000_000} tokens ·{" "}
-                  {u._count.items} items · {u._count.swapsOffered + u._count.swapsRequested} swaps ·{" "}
-                  {u.admin ? `admin (${u.admin.role})` : "user"}
+                  {u.email} · {u._count.items} items · {u._count.swapsOffered + u._count.swapsRequested} swaps ·{" "}
+                  {u._count.paymentsMade} payments · {u.admin ? `admin (${u.admin.role})` : "user"}
                 </p>
               </div>
-              {credit?.userId === u.id ? (
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min="1"
-                    value={credit.tokens}
-                    onChange={(e) => setCredit({ userId: u.id, tokens: e.target.value })}
-                    placeholder="tokens"
-                    className="w-24 rounded-btn border border-line bg-surface-2 px-2 py-1 text-sm text-foreground"
-                  />
-                  <button type="button" onClick={doCredit} className="rounded-btn bg-emerald-600 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-500">
-                    Confirm
-                  </button>
-                  <button type="button" onClick={() => setCredit(null)} className="text-xs text-muted hover:text-foreground">
-                    Cancel
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setCredit({ userId: u.id, tokens: "" })}
-                  className="rounded-btn border border-emerald-600 px-3 py-1 text-xs font-semibold text-emerald-300 hover:bg-emerald-950"
-                >
-                  Credit tokens
-                </button>
-              )}
             </div>
           ))}
         </div>
@@ -90,7 +50,7 @@ export default function AdminActions({ accessToken, users, items }: Props) {
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-foreground">{item.title}</p>
                 <p className="truncate text-xs text-muted">
-                  {item.owner.name} · {Number(BigInt(item.valueMicroTokens)) / 1_000_000} tokens ·{" "}
+                  {item.owner.name} · {formatPence(item.valuePence)} ·{" "}
                   {ITEM_STATUS_LABELS[item.status] ?? item.status}
                 </p>
               </div>

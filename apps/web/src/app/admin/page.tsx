@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/auth";
-import { fetchAdminListings, fetchAdminStats, fetchAdminUsers, fetchMe } from "@/lib/api";
+import { fetchAdminListings, fetchAdminStats, fetchAdminUsers, fetchMe, formatPence } from "@/lib/api";
 import AdminActions from "@/components/AdminActions";
 
 export const metadata = { title: "Admin - Swapify" };
@@ -32,8 +32,6 @@ export default async function AdminPage() {
     );
   }
 
-  const escrowTokens = Number(BigInt(stats.escrowedMicroTokens)) / 1_000_000;
-
   return (
     <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-12 sm:px-6">
       <h1 className="text-3xl font-bold tracking-tight text-foreground">Admin dashboard</h1>
@@ -45,7 +43,8 @@ export default async function AdminPage() {
           { label: "Listings", value: stats.items },
           { label: "Swaps", value: stats.swaps },
           { label: "Active swaps", value: stats.activeSwaps },
-          { label: "Tokens in escrow", value: escrowTokens.toLocaleString() },
+          { label: "Paid gap payments", value: stats.paidSwaps },
+          { label: "Total service fees", value: formatPence(stats.totalFeesPence) },
         ].map((s) => (
           <div key={s.label} className="rounded-card border border-line bg-surface p-5 shadow-card">
             <p className="text-sm text-muted">{s.label}</p>

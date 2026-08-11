@@ -1,6 +1,5 @@
 import { FastifyInstance, FastifyPluginAsync } from 'fastify';
-import { prisma } from '@swapify/db';
-import { creditTokenOrder, parseWebhookEvent, simulationAllowed } from '../services/stripe.js';
+import { markPaymentPaid, parseWebhookEvent, simulationAllowed } from '../services/stripe.js';
 
 const stripeRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
   // Stripe's canonical source of truth for completed payments.
@@ -25,17 +24,17 @@ const stripeRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
 
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object;
-      const orderId = session.metadata?.orderId;
+      const paymentId = session.metadata?.paymentId;
 
-      if (orderId) {
+      if (paymentId) {
         try {
-          await creditTokenOrder(orderId, session.id);
-          request.log.info(`Credited order ${orderId} from Stripe webhook`);
+          // Idempotent: the payment's unique session id prevents double-entry.
+          await markPaymentPaid(paymentId, session.id, session.payment_intent as string | null);
+          request.log.info(`Recorded payment ${paymentId} from Stripe webhook`);
         } catch (err) {
-          // Stripe retries failed webhooks; the ledger idempotency key means
-          // a retry will simply no-op once this succeeds.
-          request.log.error(err, `Failed to credit order ${orderId}`);
-          return reply.code(500).send({ error: 'Failed to credit order' });
+          // Stripe retries failed webhooks; markPaymentPaid no-ops once recorded.
+          request.log.error(err, `Failed to record payment ${paymentId}`);
+          return reply.code(500).send({ error: 'Failed to record payment' });
         }
       }
     }
@@ -44,21 +43,20 @@ const stripeRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
   });
 
   // Local-dev checkout flow: without a Stripe key outside production, the
-  // "buy" button points here instead of Stripe, so the full purchase flow is
-  // still testable. Never registered in production.
+  // "Pay" button points here instead of Stripe, so the payment flow is still
+  // testable. Never registered in production.
   if (simulationAllowed) {
-    app.get('/stripe/dev-confirm/:orderId', async (request, reply) => {
-      const { orderId } = request.params as { orderId: string };
+    app.get('/stripe/dev-confirm/:paymentId', async (request, reply) => {
+      const { paymentId } = request.params as { paymentId: string };
 
-      const order = await prisma.tokenOrder.findUnique({ where: { id: orderId } });
-      if (!order) {
-        return reply.code(404).send({ error: 'Order not found' });
+      try {
+        const payment = await markPaymentPaid(paymentId, null);
+        const base = process.env.WEB_BASE_URL ?? 'http://localhost:3000';
+        return reply.redirect(`${base}/swaps/${payment.swapId}?paid=1`);
+      } catch (err) {
+        request.log.error(err, `Failed to confirm simulated payment ${paymentId}`);
+        return reply.code(404).send({ error: 'Payment not found' });
       }
-
-      await creditTokenOrder(orderId, null);
-
-      const base = process.env.WEB_BASE_URL ?? 'http://localhost:3000';
-      return reply.redirect(`${base}/tokens?paid=1`);
     });
   }
 };

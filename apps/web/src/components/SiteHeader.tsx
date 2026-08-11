@@ -2,9 +2,8 @@
 
 import Link from "next/link";
 import { signIn, signOut, useSession } from "next-auth/react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
-  Coins,
   LogOut,
   Menu,
   Repeat,
@@ -15,47 +14,12 @@ import {
   X,
 } from "lucide-react";
 import NotificationBell from "./NotificationBell";
-import { fetchMe } from "@/lib/api";
 
 const NAV_LINKS = [
   { href: "/browse", label: "Browse" },
   { href: "/#how-it-works", label: "How it works" },
   { href: "/#categories", label: "Categories" },
-  { href: "/tokens", label: "Tokens" },
 ];
-
-function TokenBalance() {
-  const { data: session } = useSession();
-  const [tokens, setTokens] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (!session?.accessToken) return;
-    let cancelled = false;
-    fetchMe(session.accessToken)
-      .then(({ user }) => {
-        if (!cancelled && user.wallet) {
-          setTokens(Number(user.wallet.balanceMicroTokens) / 1_000_000);
-        }
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [session?.accessToken]);
-
-  if (!session?.user || tokens === null) return null;
-
-  return (
-    <Link
-      href="/wallet"
-      className="inline-flex h-9 items-center gap-1.5 rounded-btn border border-token/25 bg-token/10 px-3 text-sm font-semibold text-token transition-colors hover:bg-token/20"
-      title="Your token balance"
-    >
-      <Coins className="h-4 w-4" aria-hidden />
-      {tokens}
-    </Link>
-  );
-}
 
 function UserMenu() {
   const { data: session } = useSession();
@@ -68,9 +32,8 @@ function UserMenu() {
 
   const links = [
     { href: "/profile", label: "Profile", icon: User },
-    { href: "/wallet", label: "Wallet", icon: Wallet },
     { href: "/swaps", label: "My swaps", icon: Repeat },
-    { href: "/wishlists", label: "Wishlists", icon: Coins },
+    { href: "/wishlists", label: "Wishlists", icon: Wallet },
   ];
 
   return (
@@ -185,7 +148,6 @@ export default function SiteHeader() {
           <SearchForm className="hidden w-56 xl:block" />
           <div className="hidden items-center gap-2.5 sm:flex">
             <NotificationBell />
-            <TokenBalance />
             {session?.user ? (
               <UserMenu />
             ) : (
@@ -225,7 +187,6 @@ export default function SiteHeader() {
           </nav>
           <div className="mt-3 flex items-center gap-3 border-t border-line pt-3">
             <NotificationBell />
-            <TokenBalance />
             {session?.user ? (
               <div className="ml-auto">
                 <UserMenu />

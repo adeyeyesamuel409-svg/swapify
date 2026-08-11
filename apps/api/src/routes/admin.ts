@@ -1,8 +1,6 @@
 import { FastifyInstance, FastifyPluginAsync } from 'fastify';
-import { AdminRole, ItemStatus, SwapStatus, TransactionDirection, TransactionType, prisma } from '@swapify/db';
+import { AdminRole, ItemStatus, PaymentStatus, SwapStatus, prisma } from '@swapify/db';
 import { HttpError } from '../services/swaps.js';
-import { applyLedgerEntry } from '../services/ledger.js';
-import { tokensToMicroTokens } from '@swapify/shared';
 
 const statusSchema = {
   params: {
@@ -19,22 +17,6 @@ const statusSchema = {
   },
 } as const;
 
-const creditSchema = {
-  params: {
-    type: 'object',
-    required: ['id'],
-    properties: { id: { type: 'string' } },
-  },
-  body: {
-    type: 'object',
-    required: ['tokens'],
-    properties: {
-      tokens: { type: 'number', exclusiveMinimum: 0 },
-      note: { type: 'string', maxLength: 200 },
-    },
-  },
-} as const;
-
 // Rejects non-admins. request.user.admin is populated when the User row has a
 // matching Admin row (see /auth/me).
 function requireAdmin(user: { admin: { role: AdminRole } | null }): void {
@@ -47,21 +29,31 @@ const adminRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
   app.get('/admin/stats', { preHandler: [app.authenticate] }, async (request) => {
     requireAdmin(request.user!);
 
-    const [users, items, swaps, activeSwaps, escrowed] = await Promise.all([
+    const [users, items, swaps, activeSwaps, paidSwaps, revenue] = await Promise.all([
       prisma.user.count(),
       prisma.item.count(),
       prisma.swap.count(),
       prisma.swap.count({
-        where: { status: { in: [SwapStatus.REQUESTED, SwapStatus.AGREED, SwapStatus.ESCROWED, SwapStatus.SHIPPED] } },
+        where: { status: { in: [SwapStatus.REQUESTED, SwapStatus.AGREED, SwapStatus.PAID, SwapStatus.SHIPPED] } },
       }),
-      prisma.escrowHold.aggregate({
-        where: { status: 'HELD' },
-        _sum: { amountMicroTokens: true },
+      prisma.swap.count({ where: { status: SwapStatus.PAID } }),
+      prisma.payment.aggregate({
+        where: { status: PaymentStatus.PAID },
+        _sum: { feePence: true },
       }),
     ]);
 
     return {
-      stats: { users, items, swaps, activeSwaps, escrowedMicroTokens: escrowed._sum.amountMicroTokens ?? 0n },
+      stats: {
+        users,
+        items,
+        swaps,
+        activeSwaps,
+        paidSwaps,
+        // Aggregate sums come back as BigInt from Prisma; coerce to a plain
+        // number of pence so Fastify's JSON serializer can emit them.
+        totalFeesPence: Number(revenue._sum.feePence ?? 0n),
+      },
     };
   });
 
@@ -77,8 +69,7 @@ const adminRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
         email: true,
         createdAt: true,
         admin: { select: { role: true } },
-        wallet: { select: { balanceMicroTokens: true } },
-        _count: { select: { items: true, swapsOffered: true, swapsRequested: true } },
+        _count: { select: { items: true, swapsOffered: true, swapsRequested: true, paymentsMade: true } },
       },
     });
 
@@ -120,32 +111,6 @@ const adminRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
       include: { owner: { select: { id: true, name: true, email: true } } },
     });
     return { item };
-  });
-
-  // Manual token adjustment to a user's wallet (recorded as an ADJUSTMENT).
-  app.post('/admin/users/:id/credit', { preHandler: [app.authenticate], schema: creditSchema }, async (request, reply) => {
-    requireAdmin(request.user!);
-
-    const { id } = request.params as { id: string };
-    const { tokens, note } = request.body as { tokens: number; note?: string };
-
-    const user = await prisma.user.findUnique({
-      where: { id },
-      include: { wallet: true },
-    });
-    if (!user?.wallet) {
-      return reply.code(404).send({ error: 'User or wallet not found' });
-    }
-
-    const tx = await applyLedgerEntry({
-      walletId: user.wallet.id,
-      type: TransactionType.ADJUSTMENT,
-      direction: TransactionDirection.CREDIT,
-      amountMicroTokens: tokensToMicroTokens(tokens),
-      note: note ?? 'Admin adjustment',
-    });
-
-    return { tx };
   });
 };
 

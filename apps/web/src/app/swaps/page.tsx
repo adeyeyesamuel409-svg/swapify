@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { authOptions } from "@/auth";
-import { fetchMe, fetchSwaps, itemValue, type ApiSwap } from "@/lib/api";
+import { fetchMe, fetchSwaps, formatPence, type ApiSwap } from "@/lib/api";
 import { SWAP_STATUS_LABELS } from "@swapify/shared";
 import SwapActions from "@/components/SwapActions";
 
@@ -10,24 +10,22 @@ export const metadata = { title: "My Swaps - Swapify" };
 
 function SwapCard({ swap, accessToken, myUserId }: { swap: ApiSwap; accessToken: string; myUserId: string }) {
   const amOffering = swap.offeringUserId === myUserId;
-  const gapTokens = Number(BigInt(swap.gapMicroTokens)) / 1_000_000;
+  const gapPence = swap.gapPence;
   const statusColor: Record<string, string> = {
     REQUESTED: "text-amber-300 border-amber-500/40 bg-amber-950",
     AGREED: "text-sky-300 border-sky-500/40 bg-sky-950",
-    ESCROWED: "text-emerald-300 border-emerald-500/40 bg-emerald-950",
+    PAID: "text-emerald-300 border-emerald-500/40 bg-emerald-950",
     COMPLETED: "text-emerald-300 border-emerald-500/40 bg-emerald-950",
     CANCELLED: "text-muted border-line bg-surface-2",
     EXPIRED: "text-muted border-line bg-surface-2",
   };
 
-  const escrowLabel =
-    swap.escrow?.status === "HELD"
-      ? `Tokens held in escrow: ${Number(BigInt(swap.escrow.amountMicroTokens)) / 1_000_000}`
-      : swap.escrow?.status === "RELEASED"
-        ? "Escrow released"
-        : swap.escrow?.status === "REFUNDED"
-          ? "Escrow refunded"
-          : null;
+  const paymentLabel =
+    swap.payment?.status === "PAID"
+      ? "Value-gap payment received"
+      : swap.payment?.status === "PENDING"
+        ? "Payment pending"
+        : null;
 
   return (
     <div className="rounded-card border border-line bg-surface p-5 shadow-card">
@@ -46,20 +44,20 @@ function SwapCard({ swap, accessToken, myUserId }: { swap: ApiSwap; accessToken:
           <Link href={`/items/${swap.offeringItem.id}`} className="mt-1 block truncate font-semibold text-primary-soft hover:underline">
             {swap.offeringItem.title}
           </Link>
-          <p className="text-xs text-primary-soft">{itemValue(swap.offeringItem)} tokens</p>
+          <p className="text-xs text-primary-soft">{formatPence(swap.offeringItem.valuePence)}</p>
         </div>
         <div className="rounded-btn border border-line bg-surface-2 p-3">
           <p className="text-xs text-muted">{amOffering ? `${swap.requestedUser.name} offers` : "You receive"}</p>
           <Link href={`/items/${swap.requestedItem.id}`} className="mt-1 block truncate font-semibold text-primary-soft hover:underline">
             {swap.requestedItem.title}
           </Link>
-          <p className="text-xs text-primary-soft">{itemValue(swap.requestedItem)} tokens</p>
+          <p className="text-xs text-primary-soft">{formatPence(swap.requestedItem.valuePence)}</p>
         </div>
       </div>
 
-      {gapTokens > 0 && (
+      {gapPence > 0 && (
         <p className="mt-3 text-xs text-muted">
-          Value gap: <span className="font-semibold text-token">{gapTokens} tokens</span> paid by{" "}
+          Value gap: <span className="font-semibold text-token">{formatPence(gapPence)}</span> paid by{" "}
           {amOffering
             ? swap.gapPayer === "OFFERING_USER"
               ? "you"
@@ -70,9 +68,9 @@ function SwapCard({ swap, accessToken, myUserId }: { swap: ApiSwap; accessToken:
         </p>
       )}
 
-      {escrowLabel && (
+      {paymentLabel && (
         <p className="mt-2 inline-block rounded-pill bg-emerald-950 px-2 py-0.5 text-xs font-semibold text-emerald-300">
-          {escrowLabel}
+          {paymentLabel}
         </p>
       )}
 

@@ -1,10 +1,14 @@
 import { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { Category, Condition, ItemStatus, prisma } from '@swapify/db';
-import { tokensToMicroTokens } from '@swapify/shared';
+import { assertNoActiveSwap } from '../services/swaps.js';
 import { deleteImage, StorageError } from '../services/storage.js';
 
 const categoryValues = Object.values(Category);
 const conditionValues = Object.values(Condition);
+
+// Upper bound for a listing's value: £1,000,000 in pence. Prevents overflow
+// and keeps displayed values sane.
+const MAX_VALUE_PENCE = 100_000_000;
 
 const itemParamsSchema = {
   params: {
@@ -17,14 +21,14 @@ const itemParamsSchema = {
 const createItemSchema = {
   body: {
     type: 'object',
-    required: ['title', 'description', 'category', 'condition', 'valueTokens'],
+    required: ['title', 'description', 'category', 'condition', 'valuePence'],
     properties: {
       title: { type: 'string', minLength: 3, maxLength: 120 },
       description: { type: 'string', minLength: 10, maxLength: 4000 },
       category: { type: 'string', enum: categoryValues },
       condition: { type: 'string', enum: conditionValues },
-      // Value in whole tokens (fractions allowed, e.g. 12.5).
-      valueTokens: { type: 'number', exclusiveMinimum: 0 },
+      // Value in GBP pence (integer). £180.00 = 18000.
+      valuePence: { type: 'integer', exclusiveMinimum: 0, maximum: MAX_VALUE_PENCE },
       // Image URLs for now; S3 upload arrives in Sprint 8.
       images: { type: 'array', items: { type: 'string' }, maxItems: 8 },
     },
@@ -45,7 +49,7 @@ const updateItemSchema = {
       description: { type: 'string', minLength: 10, maxLength: 4000 },
       category: { type: 'string', enum: categoryValues },
       condition: { type: 'string', enum: conditionValues },
-      valueTokens: { type: 'number', exclusiveMinimum: 0 },
+      valuePence: { type: 'integer', exclusiveMinimum: 0, maximum: MAX_VALUE_PENCE },
       status: { type: 'string', enum: Object.values(ItemStatus) },
       images: { type: 'array', items: { type: 'string' }, maxItems: 8 },
     },
@@ -106,9 +110,9 @@ const itemsRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
 
     const orderBy =
       sort === 'value_asc'
-        ? [{ valueMicroTokens: 'asc' as const }, { createdAt: 'desc' as const }]
+        ? [{ valuePence: 'asc' as const }, { createdAt: 'desc' as const }]
         : sort === 'value_desc'
-          ? [{ valueMicroTokens: 'desc' as const }, { createdAt: 'desc' as const }]
+          ? [{ valuePence: 'desc' as const }, { createdAt: 'desc' as const }]
           : [{ createdAt: 'desc' as const }];
 
     const [items, total] = await Promise.all([
@@ -159,7 +163,7 @@ const itemsRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
       description: string;
       category: Category;
       condition: Condition;
-      valueTokens: number;
+      valuePence: number;
       images?: string[];
     };
 
@@ -170,7 +174,7 @@ const itemsRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
         description: body.description,
         category: body.category,
         condition: body.condition,
-        valueMicroTokens: tokensToMicroTokens(body.valueTokens),
+        valuePence: body.valuePence,
         images: {
           create: (body.images ?? []).map((url, index) => ({ url, position: index })),
         },
@@ -189,7 +193,7 @@ const itemsRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
       description?: string;
       category?: Category;
       condition?: Condition;
-      valueTokens?: number;
+      valuePence?: number;
       status?: ItemStatus;
       images?: string[];
     };
@@ -212,9 +216,7 @@ const itemsRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
           ...(body.category !== undefined ? { category: body.category } : {}),
           ...(body.condition !== undefined ? { condition: body.condition } : {}),
           ...(body.status !== undefined ? { status: body.status } : {}),
-          ...(body.valueTokens !== undefined
-            ? { valueMicroTokens: tokensToMicroTokens(body.valueTokens) }
-            : {}),
+          ...(body.valuePence !== undefined ? { valuePence: body.valuePence } : {}),
         },
         include: itemInclude,
       });
@@ -263,6 +265,10 @@ const itemsRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
     if (!existing || existing.ownerId !== user.id) {
       return reply.code(404).send({ error: 'Item not found' });
     }
+
+    // An item that's part of an in-progress swap can't be deleted - the swap
+    // still references it. Once the swap finishes the item can be removed.
+    await assertNoActiveSwap(prisma, id);
 
     // Soft delete keeps historical swaps intact.
     const item = await prisma.item.update({

@@ -8,7 +8,7 @@ import {
   fetchMe,
   fetchWishlists,
   fetchWishlistMatches,
-  itemValue,
+  formatPence,
   timeAgo,
   type ApiItem,
 } from "@/lib/api";
@@ -17,7 +17,7 @@ import SwapRequestButton from "@/components/SwapRequestButton";
 import ItemGallery from "@/components/ItemGallery";
 import ItemCard from "@/components/ItemCard";
 import SellerCard from "@/components/SellerCard";
-import { ArrowLeft, Coins, Sparkles } from "lucide-react";
+import { ArrowLeft, Sparkles } from "lucide-react";
 
 export default async function ItemDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -109,14 +109,13 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
                 <p className="text-xs text-muted">Used to balance swap differences</p>
               </div>
               <p className="mt-1 inline-flex items-center gap-1.5 text-2xl font-bold text-token">
-                <Coins className="h-5 w-5" aria-hidden />
-                {itemValue(item)} tokens
+                {formatPence(item.valuePence)}
               </p>
             </div>
 
             {!isOwnItem &&
               (session?.accessToken ? (
-                <SwapRequestButton itemId={item.id} itemTitle={item.title} itemValueTokens={itemValue(item)} />
+                <SwapRequestButton itemId={item.id} itemTitle={item.title} itemValuePence={item.valuePence} />
               ) : (
                 <Link
                   href={`/api/auth/signin?callbackUrl=${encodeURIComponent(`/items/${item.id}`)}`}

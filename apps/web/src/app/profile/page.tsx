@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { authOptions } from "@/auth";
 import { fetchMe, fetchUserRatings } from "@/lib/api";
+import MyListings from "@/components/MyListings";
 
 export const metadata = { title: "My Profile - Swapify" };
 
@@ -25,7 +26,6 @@ export default async function ProfilePage() {
     );
   }
   const ratings = await fetchUserRatings(user.id).catch(() => null);
-  const tokens = user.wallet ? Number(user.wallet.balanceMicroTokens) / 1_000_000 : 0;
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 py-12 sm:px-6">
@@ -52,23 +52,7 @@ export default async function ProfilePage() {
         {user.bio && <p className="mt-2 text-sm text-muted">{user.bio}</p>}
       </div>
 
-      <div className="rounded-card border border-token/30 bg-token/10 p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-token">Token balance</p>
-            <p className="mt-1 text-3xl font-bold text-token">{tokens.toLocaleString()} tokens</p>
-            <p className="mt-1 text-xs text-muted">
-              Earned by swapping, or bought. Used to balance value gaps.
-            </p>
-          </div>
-          <a
-            href="/wallet"
-            className="rounded-btn border border-token/40 px-4 py-2 text-sm font-semibold text-token transition-colors hover:bg-token/15"
-          >
-            View history
-          </a>
-        </div>
-      </div>
+      <MyListings accessToken={session.accessToken} />
 
       {ratings && ratings.total > 0 && (
         <div className="rounded-card border border-line bg-surface p-6">

@@ -3,17 +3,17 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSession, signIn } from "next-auth/react";
-import { createSwap, fetchMyItems, itemValue, type ApiItem } from "@/lib/api";
+import { createSwap, fetchMyItems, formatPence, type ApiItem } from "@/lib/api";
 import ItemImage from "@/components/ItemImage";
 import { ArrowRight, Check, ImageOff } from "lucide-react";
 
 type Props = {
   itemId: string;
   itemTitle: string;
-  itemValueTokens: number;
+  itemValuePence: number;
 };
 
-export default function SwapRequestButton({ itemId, itemTitle, itemValueTokens }: Props) {
+export default function SwapRequestButton({ itemId, itemTitle, itemValuePence }: Props) {
   const { data: session, status } = useSession();
   const [myItems, setMyItems] = useState<ApiItem[]>([]);
   const [selectedId, setSelectedId] = useState("");
@@ -55,8 +55,8 @@ export default function SwapRequestButton({ itemId, itemTitle, itemValueTokens }
   }
 
   const selected = myItems.find((i) => i.id === selectedId);
-  const gap = selected ? Math.abs(itemValue(selected) - itemValueTokens) : null;
-  const iPay = selected ? itemValue(selected) < itemValueTokens : null;
+  const gap = selected ? Math.abs(selected.valuePence - itemValuePence) : null;
+  const iPay = selected ? selected.valuePence < itemValuePence : null;
 
   const submit = async () => {
     setError("");
@@ -76,7 +76,7 @@ export default function SwapRequestButton({ itemId, itemTitle, itemValueTokens }
   return (
     <div className="mt-6 rounded-card border border-primary/30 bg-primary/10 p-4">
       <p className="text-sm font-semibold text-primary-soft">Swap for it</p>
-      <p className="mt-1 text-xs text-muted">Offer one of your own items. Value gaps are settled with tokens.</p>
+      <p className="mt-1 text-xs text-muted">Offer one of your own items. Value gaps are settled with a secure payment.</p>
 
       {myItems.length === 0 ? (
         <p className="mt-3 text-sm text-muted">
@@ -116,7 +116,7 @@ export default function SwapRequestButton({ itemId, itemTitle, itemValueTokens }
                   </div>
                   <div className="p-2">
                     <p className="truncate text-xs font-medium text-foreground">{i.title}</p>
-                    <p className="text-[11px] text-token">{itemValue(i)} tokens</p>
+                    <p className="text-[11px] text-token">{formatPence(i.valuePence)}</p>
                   </div>
                 </button>
               );
@@ -129,21 +129,21 @@ export default function SwapRequestButton({ itemId, itemTitle, itemValueTokens }
                 <div className="min-w-0">
                   <p className="text-[11px] text-muted">You offer</p>
                   <p className="truncate text-sm font-semibold text-foreground">{selected.title}</p>
-                  <p className="text-xs text-token">{itemValue(selected)} tokens</p>
+                  <p className="text-xs text-token">{formatPence(selected.valuePence)}</p>
                 </div>
                 <ArrowRight className="h-5 w-5 shrink-0 text-primary-soft" aria-hidden />
                 <div className="min-w-0 text-right">
                   <p className="text-[11px] text-muted">Their item</p>
                   <p className="truncate text-sm font-semibold text-foreground">{itemTitle}</p>
-                  <p className="text-xs text-token">{itemValueTokens} tokens</p>
+                  <p className="text-xs text-token">{formatPence(itemValuePence)}</p>
                 </div>
               </div>
               <p className="mt-2 border-t border-line pt-2 text-xs text-primary-soft">
                 {gap === 0
-                  ? "Values match — no tokens needed."
+                  ? "Values match — no payment needed."
                   : iPay
-                    ? `You'll pay the ${gap} token gap.`
-                    : `The owner pays the ${gap} token gap to even it out.`}
+                    ? `You'll pay ${formatPence(gap)} to balance the value gap.`
+                    : `The owner pays ${formatPence(gap)} to even it out.`}
               </p>
             </div>
           )}

@@ -1,7 +1,7 @@
 import { ArrowRight, PackagePlus, ShieldCheck, Sparkles } from "lucide-react";
 import Button from "../Button";
 import type { ApiItem } from "@/lib/api";
-import { itemValue, resolveImageUrl } from "@/lib/api";
+import { formatPence, resolveImageUrl } from "@/lib/api";
 
 function HeroPhoto({ item, className = "" }: { item: ApiItem; className?: string }) {
   const img = item.images[0]?.url;
@@ -15,7 +15,7 @@ function HeroPhoto({ item, className = "" }: { item: ApiItem; className?: string
       )}
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-bg/90 to-transparent px-3 pb-2 pt-6">
         <p className="line-clamp-1 text-sm font-semibold text-foreground">{item.title}</p>
-        <p className="text-xs text-token">{itemValue(item)} tokens</p>
+        <p className="text-xs text-token">{formatPence(item.valuePence)}</p>
       </div>
     </div>
   );
@@ -38,7 +38,7 @@ export default function HeroSection({ items }: { items: ApiItem[] }) {
         <div className="animate-fade-up">
           <span className="inline-flex items-center gap-1.5 rounded-pill border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary-soft">
             <Sparkles className="h-3.5 w-3.5" aria-hidden />
-            Free to join · No cash for your items · Protected by token escrow
+            Free to join · Fair value gaps · Protected swaps
           </span>
 
           <h1 className="mt-5 text-4xl font-bold leading-[1.05] tracking-tight text-foreground sm:text-5xl lg:text-6xl">
@@ -48,7 +48,7 @@ export default function HeroSection({ items }: { items: ApiItem[] }) {
 
           <p className="mt-5 max-w-lg text-lg text-muted">
             List the things gathering dust and discover things you actually want — from people nearby.
-            When values don&apos;t match, our tokens balance the difference.
+            When values don&apos;t match, a small payment balances the difference.
           </p>
 
           <div className="mt-8 flex flex-wrap items-center gap-3">
@@ -65,7 +65,7 @@ export default function HeroSection({ items }: { items: ApiItem[] }) {
           <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted">
             <span className="inline-flex items-center gap-1.5">
               <ShieldCheck className="h-4 w-4 text-emerald-400" aria-hidden />
-              Token escrow on every swap
+              Payments held until both sides confirm
             </span>
             <span className="inline-flex items-center gap-1.5">
               <Sparkles className="h-4 w-4 text-primary-soft" aria-hidden />
@@ -85,7 +85,7 @@ export default function HeroSection({ items }: { items: ApiItem[] }) {
               </div>
               <div className="absolute -right-4 -top-4 rounded-card border border-token/30 bg-bg/90 px-4 py-3 shadow-raise backdrop-blur">
                 <p className="text-xs text-muted">Latest listing</p>
-                <p className="text-lg font-bold text-token">{itemValue(big)} tokens</p>
+                <p className="text-lg font-bold text-token">{formatPence(big.valuePence)}</p>
               </div>
             </>
           ) : (

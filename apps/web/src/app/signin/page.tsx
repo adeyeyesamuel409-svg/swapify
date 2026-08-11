@@ -50,7 +50,7 @@ function SignInForm() {
             </h1>
             <p className="mt-1 text-sm text-muted">
               {mode === "signin"
-                ? "Sign in to offer swaps, chat, and balance gaps with tokens."
+                ? "Sign in to offer swaps, chat, and balance value gaps."
                 : "Create an account to list items and start swapping."}
             </p>
           </div>

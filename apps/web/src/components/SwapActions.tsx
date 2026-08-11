@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { acceptSwap, cancelSwap, confirmSwap, declineSwap, fundSwap, type ApiSwap } from "@/lib/api";
+import { acceptSwap, cancelSwap, confirmSwap, declineSwap, formatPence, paySwap, type ApiSwap } from "@/lib/api";
 
 type Props = {
   swap: ApiSwap;
@@ -30,6 +30,18 @@ export default function SwapActions({ swap, accessToken, myUserId }: Props) {
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Action failed");
+      setBusy(false);
+    }
+  };
+
+  const pay = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      const { checkoutUrl } = await paySwap(accessToken, swap.id);
+      window.location.href = checkoutUrl;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not start payment");
       setBusy(false);
     }
   };
@@ -68,18 +80,29 @@ export default function SwapActions({ swap, accessToken, myUserId }: Props) {
         </button>
       )}
 
-      {swap.status === "AGREED" && iAmPayer && (
+      {swap.status === "AGREED" && iAmPayer && swap.gapPence > 0 && (
         <button
           type="button"
           disabled={busy}
-          onClick={() => act(fundSwap)}
+          onClick={pay}
           className="mt-3 w-full rounded-btn bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition-all hover:bg-emerald-500 disabled:opacity-50"
         >
-          {busy ? "Holding..." : `Fund escrow (${Number(BigInt(swap.gapMicroTokens)) / 1_000_000} tokens)`}
+          {busy ? "Opening checkout..." : `Pay ${formatPence(swap.gapPence)}`}
         </button>
       )}
 
-      {(swap.status === "AGREED" || swap.status === "ESCROWED") && (
+      {swap.status === "AGREED" && iAmPayer && swap.gapPence === 0 && !iConfirmed && (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => act(confirmSwap)}
+          className="mt-3 w-full rounded-btn border border-emerald-500 px-3 py-2 text-sm font-semibold text-emerald-300 hover:bg-emerald-950 disabled:opacity-50"
+        >
+          Confirm I received my item
+        </button>
+      )}
+
+      {(swap.status === "AGREED" || swap.status === "PAID") && (
         <>
           {!iConfirmed ? (
             <button
@@ -104,6 +127,12 @@ export default function SwapActions({ swap, accessToken, myUserId }: Props) {
             </button>
           )}
         </>
+      )}
+
+      {swap.status === "PAID" && iAmPayer && (
+        <p className="mt-2 text-xs text-emerald-400">
+          Payment received. Both sides can confirm receipt to finish the swap.
+        </p>
       )}
 
       {error && <p className="mt-2 text-sm text-rose-400">{error}</p>}

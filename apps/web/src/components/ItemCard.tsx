@@ -1,15 +1,15 @@
 import Link from "next/link";
 import { CATEGORY_LABELS, CONDITION_LABELS, ITEM_STATUS_LABELS } from "@swapify/shared";
-import { itemValue, timeAgo, type ApiItem } from "@/lib/api";
+import { formatPence, timeAgo, type ApiItem } from "@/lib/api";
 import ItemImage from "@/components/ItemImage";
-import { Coins, Repeat } from "lucide-react";
+import { Repeat } from "lucide-react";
 
 export default function ItemCard({ item }: { item: ApiItem }) {
   const category = CATEGORY_LABELS[item.category as keyof typeof CATEGORY_LABELS] ?? item.category;
   const condition = CONDITION_LABELS[item.condition as keyof typeof CONDITION_LABELS] ?? item.condition;
   const status = ITEM_STATUS_LABELS[item.status] ?? item.status;
   const isActive = item.status === "ACTIVE";
-  const value = itemValue(item);
+  const value = formatPence(item.valuePence);
 
   return (
     <Link
@@ -48,8 +48,7 @@ export default function ItemCard({ item }: { item: ApiItem }) {
         )}
         <div className="absolute bottom-3 left-3">
           <span className="inline-flex items-center gap-1 rounded-pill border border-token/40 bg-bg/85 px-2.5 py-1 text-xs font-bold text-token shadow-card backdrop-blur">
-            <Coins className="h-3.5 w-3.5" aria-hidden />
-            {value} tokens
+            {value}
           </span>
         </div>
       </div>

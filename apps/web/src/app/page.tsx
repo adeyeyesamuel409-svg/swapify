@@ -3,7 +3,6 @@ import HeroSection from "@/components/home/HeroSection";
 import FeaturedSection from "@/components/home/FeaturedSection";
 import HowItWorksSection from "@/components/home/HowItWorksSection";
 import CategoriesSection from "@/components/home/CategoriesSection";
-import TokensExplainerSection from "@/components/home/TokensExplainerSection";
 import FinalCtaSection from "@/components/home/FinalCtaSection";
 
 export default async function Home() {
@@ -24,7 +23,6 @@ export default async function Home() {
       <FeaturedSection items={featured} />
       <HowItWorksSection />
       <CategoriesSection />
-      <TokensExplainerSection items={active} />
       <FinalCtaSection />
     </>
   );

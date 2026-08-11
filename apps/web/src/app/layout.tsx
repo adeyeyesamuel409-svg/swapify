@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { ReactNode } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Providers from "./providers";
@@ -18,10 +19,10 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Swapify - Swap what you have for what you need",
   description:
-    "Swapify is a barter marketplace. Swap the items you no longer use and balance the difference with tokens.",
+    "Swapify is a barter marketplace. Swap the items you no longer use and balance the difference with a secure payment.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html
       lang="en"

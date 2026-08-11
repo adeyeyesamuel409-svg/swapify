@@ -21,7 +21,7 @@ export default function PostItemPage() {
     description: "",
     category: "ELECTRONICS",
     condition: "GOOD",
-    valueTokens: "10",
+    valuePounds: "10",
     imageUrl: "",
   });
   const [images, setImages] = useState<string[]>([]);
@@ -100,7 +100,7 @@ export default function PostItemPage() {
         description: form.description,
         category: form.category,
         condition: form.condition,
-        valueTokens: Number(form.valueTokens),
+        valuePence: Math.round(Number(form.valuePounds) * 100),
         images,
       });
       router.push(`/items/${item.id}`);
@@ -143,8 +143,9 @@ export default function PostItemPage() {
         </div>
       </div>
 
-      <label className={label}>Value (tokens)</label>
-      <input className={`${field} mt-1 w-full`} type="number" min="0" step="0.5" value={form.valueTokens} onChange={(e) => setForm({ ...form, valueTokens: e.target.value })} placeholder="e.g. 80" />
+      <label className={label}>Value (£)</label>
+      <input className={`${field} mt-1 w-full`} type="number" min="0" step="0.01" value={form.valuePounds} onChange={(e) => setForm({ ...form, valuePounds: e.target.value })} placeholder="e.g. 80.00" />
+      <p className="mt-1 text-xs text-muted">Set a fair cash value. If swap values don&apos;t match, the difference is paid by card.</p>
 
       <label className={label}>Photos</label>
       <div className="mt-1 rounded-card border border-dashed border-line bg-surface-2/50 p-4">

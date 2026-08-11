@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { authOptions } from "@/auth";
-import { fetchMe, fetchSwap, itemValue } from "@/lib/api";
+import { fetchMe, fetchSwap, formatPence } from "@/lib/api";
 import { SWAP_STATUS_LABELS } from "@swapify/shared";
 import SwapActions from "@/components/SwapActions";
 import SwapChat from "@/components/SwapChat";
@@ -13,7 +13,7 @@ import { ArrowRight } from "lucide-react";
 
 export const metadata = { title: "Swap - Swapify" };
 
-const ACTIVE_STATUSES = ["REQUESTED", "AGREED", "ESCROWED", "SHIPPED"];
+const ACTIVE_STATUSES = ["REQUESTED", "AGREED", "PAID", "SHIPPED"];
 
 export default async function SwapDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -42,7 +42,7 @@ export default async function SwapDetailPage({ params }: { params: Promise<{ id:
 
   const amOffering = swap.offeringUserId === user.id;
   const otherPartyName = amOffering ? swap.requestedUser.name : swap.offeringUser.name;
-  const gapTokens = Number(BigInt(swap.gapMicroTokens)) / 1_000_000;
+  const gapPence = swap.gapPence;
   const active = ACTIVE_STATUSES.includes(swap.status);
   const completed = swap.status === "COMPLETED";
 
@@ -76,7 +76,7 @@ export default async function SwapDetailPage({ params }: { params: Promise<{ id:
             <Link href={`/items/${swap.offeringItem.id}`} className="mt-2 block truncate font-semibold text-primary-soft hover:underline">
               {swap.offeringItem.title}
             </Link>
-            <p className="text-xs text-primary-soft">{itemValue(swap.offeringItem)} tokens</p>
+            <p className="text-xs text-primary-soft">{formatPence(swap.offeringItem.valuePence)}</p>
           </div>
           <div className="hidden items-center justify-center sm:flex">
             <ArrowRight className="h-5 w-5 text-primary-soft" aria-hidden />
@@ -93,14 +93,17 @@ export default async function SwapDetailPage({ params }: { params: Promise<{ id:
             <Link href={`/items/${swap.requestedItem.id}`} className="mt-2 block truncate font-semibold text-primary-soft hover:underline">
               {swap.requestedItem.title}
             </Link>
-            <p className="text-xs text-primary-soft">{itemValue(swap.requestedItem)} tokens</p>
+            <p className="text-xs text-primary-soft">{formatPence(swap.requestedItem.valuePence)}</p>
           </div>
         </div>
 
-        {gapTokens > 0 && (
+        {gapPence > 0 && (
           <p className="mt-3 text-xs text-muted">
-            Value gap: <span className="font-semibold text-token">{gapTokens} tokens</span>
+            Value gap: <span className="font-semibold text-token">{formatPence(gapPence)}</span>
           </p>
+        )}
+        {swap.payment?.status === "PAID" && (
+          <p className="mt-1 text-xs text-emerald-400">Payment received - value gap settled.</p>
         )}
         {swap.expiresAt && active && (
           <p className="mt-1 text-xs text-muted">

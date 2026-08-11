@@ -1,8 +1,8 @@
 import { FastifyInstance, FastifyPluginAsync } from 'fastify';
-import { ItemStatus, Prisma, Swap, SwapStatus, prisma } from '@swapify/db';
+import { ItemStatus, PaymentStatus, Prisma, Swap, SwapStatus, prisma } from '@swapify/db';
+import { calculateServiceFee } from '@swapify/shared';
 import { HttpError, assertNoActiveSwap, computeGap, withSerializableRetry } from '../services/swaps.js';
-import { InsufficientFundsError } from '../services/ledger.js';
-import { fundEscrow, gapPayerUserId, refundEscrow, releaseEscrow } from '../services/escrow.js';
+import { createSwapPaymentCheckout, refundSwapPayment } from '../services/stripe.js';
 import { notify } from '../services/notifications.js';
 
 const swapParamsSchema = {
@@ -29,8 +29,18 @@ const swapInclude = {
   requestedItem: { include: { images: { orderBy: { position: 'asc' as const } } } },
   offeringUser: { select: { id: true, name: true, imageUrl: true } },
   requestedUser: { select: { id: true, name: true, imageUrl: true } },
-  escrow: true,
+  payment: true,
 };
+
+// Origin of the API itself, used to build the simulated checkout redirect.
+function apiOrigin(request: { protocol: string; host: string }): string {
+  return `${request.protocol}://${request.host}`;
+}
+
+// Origin of the web app, used for payment success/cancel redirects.
+function appOrigin(): string {
+  return process.env.APP_URL ?? 'http://localhost:3000';
+}
 
 async function releaseItems(tx: Prisma.TransactionClient, itemIds: string[]) {
   await tx.item.updateMany({
@@ -45,15 +55,15 @@ async function getParticipantSwap(id: string, userId: string): Promise<Swap | nu
   return swap;
 }
 
-// Shared by cancel and expire: refunds any held tokens, frees the items, and
-// lands the swap in CANCELLED or EXPIRED. Only valid before either party
+// Shared by cancel and expire: refunds any recorded payment, frees the items,
+// and lands the swap in CANCELLED or EXPIRED. Only valid before either party
 // confirms receipt - once an item is in motion it needs admin help.
-async function settleCancelledSwap(
-  swap: Swap,
-  finalStatus: SwapStatus,
-): Promise<Swap> {
-  if (swap.status === SwapStatus.ESCROWED) {
-    await refundEscrow(swap);
+async function settleCancelledSwap(swap: Swap, finalStatus: SwapStatus): Promise<Swap> {
+  if (swap.status === SwapStatus.PAID) {
+    const payment = await prisma.payment.findUnique({ where: { swapId: swap.id } });
+    if (payment) {
+      await refundSwapPayment(payment.id);
+    }
   }
 
   const now = new Date();
@@ -132,7 +142,7 @@ const swapRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
       await assertNoActiveSwap(tx, offeringItemId);
       await assertNoActiveSwap(tx, requestedItemId);
 
-      const gap = computeGap(offeringItem.valueMicroTokens, requestedItem.valueMicroTokens);
+      const gap = computeGap(offeringItem.valuePence, requestedItem.valuePence);
 
       const swap = await tx.swap.create({
         data: {
@@ -140,7 +150,7 @@ const swapRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
           offeringItemId,
           requestedUserId: requestedItem.ownerId,
           requestedItemId,
-          gapMicroTokens: gap.gapMicroTokens,
+          gapPence: gap.gapPence,
           gapPayer: gap.gapPayer,
           status: SwapStatus.REQUESTED,
           expiresAt: new Date(Date.now() + 72 * 3600 * 1000),
@@ -221,48 +231,78 @@ const swapRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
     return { swap };
   });
 
-  // The gap payer moves their tokens into escrow, locking the deal.
-  app.post('/swaps/:id/fund', { preHandler: [app.authenticate], schema: swapParamsSchema }, async (request) => {
+  // The gap payer starts a Stripe Checkout payment covering the value
+  // difference plus the service fee. The swap only moves to PAID once the
+  // payment is confirmed (via webhook, or dev-confirm in the simulated flow).
+  app.post('/swaps/:id/pay', { preHandler: [app.authenticate], schema: swapParamsSchema }, async (request) => {
     const user = request.user!;
     const { id } = request.params as { id: string };
 
     const swap = await getParticipantSwap(id, user.id);
     if (!swap) throw new HttpError(404, 'Swap not found');
     if (swap.status !== SwapStatus.AGREED) {
-      throw new HttpError(409, `Cannot fund: swap is ${swap.status.toLowerCase()}`);
+      throw new HttpError(409, `Cannot pay: swap is ${swap.status.toLowerCase()}`);
     }
     if (swap.gapPayer === 'NONE') {
-      throw new HttpError(400, 'Values match - there is no gap to fund');
+      throw new HttpError(400, 'Values match - there is no gap to pay');
     }
-    if (gapPayerUserId(swap) !== user.id) {
-      throw new HttpError(403, 'Only the payer can fund the escrow');
+    const gapPayerUserId = swap.gapPayer === 'OFFERING_USER' ? swap.offeringUserId : swap.requestedUserId;
+    if (gapPayerUserId !== user.id) {
+      throw new HttpError(403, 'Only the payer can start the payment');
     }
 
-    let escrow;
-    try {
-      escrow = await fundEscrow(swap);
-    } catch (err) {
-      if (err instanceof InsufficientFundsError) {
-        throw new HttpError(400, 'Not enough tokens to cover the gap. Buy or earn more tokens first.');
+    const payment = await withSerializableRetry(async (tx) => {
+      const existing = await tx.payment.findUnique({ where: { swapId: swap.id } });
+      if (existing) {
+        if (existing.status === PaymentStatus.PAID) {
+          throw new HttpError(409, 'Payment for this swap has already been recorded');
+        }
+        return existing;
       }
-      throw err;
-    }
-
-    const updated = await prisma.swap.update({
-      where: { id },
-      data: { status: SwapStatus.ESCROWED },
-      include: swapInclude,
+      return tx.payment.create({
+        data: {
+          swapId: swap.id,
+          payerUserId: user.id,
+          amountPence: swap.gapPence,
+          feePence: calculateServiceFee(swap.gapPence),
+          totalPence: swap.gapPence + calculateServiceFee(swap.gapPence),
+          status: PaymentStatus.PENDING,
+        },
+      });
     });
 
-    const otherParty = updated.offeringUserId === user.id ? updated.requestedUserId : updated.offeringUserId;
-    await notify(otherParty, 'ESCROW', `${user.name} funded the escrow for your swap`, updated.id);
+    const higherValuePence = Math.max(
+      ...(
+        await prisma.item.findMany({
+          where: { id: { in: [swap.offeringItemId, swap.requestedItemId] } },
+          select: { valuePence: true },
+        })
+      ).map((item) => item.valuePence),
+    );
 
-    return { swap: updated, escrow };
+    const checkout = await createSwapPaymentCheckout(
+      payment,
+      higherValuePence,
+      `${appOrigin()}/swaps/${swap.id}?paid=1`,
+      `${appOrigin()}/swaps/${swap.id}`,
+    );
+
+    if (!checkout.simulated && payment.stripeCheckoutSessionId !== checkout.sessionId) {
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: { stripeCheckoutSessionId: checkout.sessionId },
+      });
+    }
+
+    const checkoutUrl = checkout.simulated
+      ? `${apiOrigin(request)}/stripe/dev-confirm/${payment.id}`
+      : checkout.url;
+
+    return { swap: { ...swap, payment }, checkoutUrl };
   });
 
   // Each party confirms they received the other's item. When both have, the
-  // swap completes: escrow releases to the person who gave more value and
-  // ownership of both items transfers.
+  // swap completes and ownership of both items transfers.
   app.post('/swaps/:id/confirm', { preHandler: [app.authenticate], schema: swapParamsSchema }, async (request) => {
     const user = request.user!;
     const { id } = request.params as { id: string };
@@ -270,12 +310,12 @@ const swapRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
     const swap = await getParticipantSwap(id, user.id);
     if (!swap) throw new HttpError(404, 'Swap not found');
 
-    if (swap.gapMicroTokens > 0n) {
-      // With a value gap, tokens must be locked in escrow before anyone confirms.
-      if (swap.status !== SwapStatus.ESCROWED) {
-        throw new HttpError(409, 'Fund the escrow before confirming receipt');
+    if (swap.gapPence > 0) {
+      // With a value gap, the payer must have paid before anyone confirms.
+      if (swap.status !== SwapStatus.PAID) {
+        throw new HttpError(409, 'The gap payment must be completed before confirming receipt');
       }
-    } else if (swap.status !== SwapStatus.AGREED && swap.status !== SwapStatus.ESCROWED) {
+    } else if (swap.status !== SwapStatus.AGREED) {
       throw new HttpError(409, `Cannot confirm: swap is ${swap.status.toLowerCase()}`);
     }
 
@@ -297,9 +337,7 @@ const swapRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
       : updated.offeringUserConfirmedAt;
 
     if (otherConfirmed) {
-      // Both sides received their item - settle the deal.
-      await releaseEscrow(updated);
-
+      // Both sides received their item - transfer ownership and close the swap.
       await prisma.$transaction([
         prisma.item.update({
           where: { id: updated.offeringItemId },
@@ -351,7 +389,7 @@ const swapRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
       return { swap: updated };
     }
 
-    if (swap.status === SwapStatus.AGREED || swap.status === SwapStatus.ESCROWED) {
+    if (swap.status === SwapStatus.AGREED || swap.status === SwapStatus.PAID) {
       if (swap.offeringUserConfirmedAt || swap.requestedUserConfirmedAt) {
         throw new HttpError(409, 'Swap is already in motion; it cannot be cancelled');
       }
@@ -372,7 +410,7 @@ const swapRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
 
     const swap = await getParticipantSwap(id, user.id);
     if (!swap) throw new HttpError(404, 'Swap not found');
-    if (swap.status !== SwapStatus.AGREED && swap.status !== SwapStatus.ESCROWED) {
+    if (swap.status !== SwapStatus.AGREED && swap.status !== SwapStatus.PAID) {
       throw new HttpError(409, `Cannot expire: swap is ${swap.status.toLowerCase()}`);
     }
     if (swap.expiresAt && swap.expiresAt > new Date()) {

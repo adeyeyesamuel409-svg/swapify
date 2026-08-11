@@ -15,22 +15,22 @@ export class HttpError extends Error {
 export const ACTIVE_SWAP_STATUSES = [
   SwapStatus.REQUESTED,
   SwapStatus.AGREED,
-  SwapStatus.ESCROWED,
+  SwapStatus.PAID,
   SwapStatus.SHIPPED,
 ];
 
-export type GapInfo = { gapMicroTokens: bigint; gapPayer: GapPayer };
+export type GapInfo = { gapPence: number; gapPayer: GapPayer };
 
 // Who pays the value difference and by how much.
 //   offered < requested -> the offering user pays, so they can get a more valuable item.
-//   offered > requested -> the requesting user pays, compensating the person giving more.
+//   offered > requested -> the requested item's owner pays, compensating the person giving more.
 //   equal              -> no gap.
-export function computeGap(offeredValue: bigint, requestedValue: bigint): GapInfo {
-  if (offeredValue === requestedValue) return { gapMicroTokens: 0n, gapPayer: GapPayer.NONE };
-  if (offeredValue < requestedValue) {
-    return { gapMicroTokens: requestedValue - offeredValue, gapPayer: GapPayer.OFFERING_USER };
+export function computeGap(offeredValuePence: number, requestedValuePence: number): GapInfo {
+  if (offeredValuePence === requestedValuePence) return { gapPence: 0, gapPayer: GapPayer.NONE };
+  if (offeredValuePence < requestedValuePence) {
+    return { gapPence: requestedValuePence - offeredValuePence, gapPayer: GapPayer.OFFERING_USER };
   }
-  return { gapMicroTokens: offeredValue - requestedValue, gapPayer: GapPayer.REQUESTING_USER };
+  return { gapPence: offeredValuePence - requestedValuePence, gapPayer: GapPayer.REQUESTING_USER };
 }
 
 // One item can only be in a single active swap at a time. Throws a 409

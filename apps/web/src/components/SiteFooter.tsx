@@ -14,18 +14,17 @@ const COLUMNS: { heading: string; links: { label: string; href: string }[] }[] =
   {
     heading: "Account",
     links: [
-      { label: "My wallet", href: "/wallet" },
       { label: "My swaps", href: "/swaps" },
       { label: "Wishlists", href: "/wishlists" },
       { label: "Profile", href: "/profile" },
     ],
   },
   {
-    heading: "Tokens",
+    heading: "Support",
     links: [
-      { label: "What are tokens?", href: "/#tokens" },
-      { label: "Buy tokens", href: "/tokens" },
       { label: "Notifications", href: "/notifications" },
+      { label: "How it works", href: "/#how-it-works" },
+      { label: "Browse", href: "/browse" },
     ],
   },
 ];
@@ -43,8 +42,8 @@ export default function SiteFooter() {
               <span className="text-lg font-bold tracking-tight text-foreground">Swapify</span>
             </Link>
             <p className="mt-3 max-w-xs text-sm text-muted">
-              Swap what you no longer use for what you need. When values don&apos;t match, our tokens
-              balance the difference.
+              Swap what you no longer use for what you need. When values don&apos;t match, a secure
+              payment balances the difference.
             </p>
           </div>
 
@@ -66,7 +65,7 @@ export default function SiteFooter() {
 
         <div className="mt-10 flex flex-col items-start justify-between gap-3 border-t border-line pt-6 sm:flex-row sm:items-center">
           <p className="text-xs text-muted">© {new Date().getFullYear()} Swapify. Trade what you own, keep what you love.</p>
-          <p className="text-xs text-muted">Listings and swaps are powered by a token escrow you can trust.</p>
+          <p className="text-xs text-muted">Value-gap payments are held until both sides confirm the swap.</p>
         </div>
       </div>
     </footer>
