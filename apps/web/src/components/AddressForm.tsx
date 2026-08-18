@@ -79,8 +79,8 @@ export default function AddressForm({ accessToken, addresses, onAddressesChange,
         onAddressesChange([...addresses, address]);
       }
       resetForm();
-    } catch (e: any) {
-      setError(e?.message ?? "Failed to save address");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to save address");
     } finally {
       setLoading(false);
     }
@@ -91,8 +91,8 @@ export default function AddressForm({ accessToken, addresses, onAddressesChange,
     try {
       await deleteAddress(accessToken, id);
       onAddressesChange(addresses.filter((a) => a.id !== id));
-    } catch (e: any) {
-      setError(e?.message ?? "Failed to delete address");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to delete address");
     } finally {
       setLoading(false);
     }

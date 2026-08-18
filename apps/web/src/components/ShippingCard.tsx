@@ -33,8 +33,8 @@ function ShipmentActions({ shipment, accessToken, onUpdated, isSender }: { shipm
     try {
       await purchaseLabel(accessToken, shipment.id, rate.carrier, rate.service);
       onUpdated();
-    } catch (e: any) {
-      setError(e?.message ?? "Failed to purchase label");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to purchase label");
     } finally {
       setLoading(false);
     }
@@ -46,8 +46,8 @@ function ShipmentActions({ shipment, accessToken, onUpdated, isSender }: { shipm
     try {
       const { rates: fetched } = await fetchShipmentRates(accessToken, shipment.id);
       setRates(fetched);
-    } catch (e: any) {
-      setError(e?.message ?? "Failed to fetch rates");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to fetch rates");
     } finally {
       setFetchingRates(false);
     }
@@ -59,8 +59,8 @@ function ShipmentActions({ shipment, accessToken, onUpdated, isSender }: { shipm
     try {
       await shipShipment(accessToken, shipment.id);
       onUpdated();
-    } catch (e: any) {
-      setError(e?.message ?? "Failed to mark as shipped");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to mark as shipped");
     } finally {
       setLoading(false);
     }
@@ -72,8 +72,8 @@ function ShipmentActions({ shipment, accessToken, onUpdated, isSender }: { shipm
     try {
       await deliverShipment(accessToken, shipment.id);
       onUpdated();
-    } catch (e: any) {
-      setError(e?.message ?? "Failed to mark as delivered");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to mark as delivered");
     } finally {
       setLoading(false);
     }
@@ -85,8 +85,8 @@ function ShipmentActions({ shipment, accessToken, onUpdated, isSender }: { shipm
     try {
       await cancelShipmentApi(accessToken, shipment.id);
       onUpdated();
-    } catch (e: any) {
-      setError(e?.message ?? "Failed to cancel shipment");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to cancel shipment");
     } finally {
       setLoading(false);
     }
@@ -148,21 +148,17 @@ export default function ShippingCard({ swapId, accessToken, myUserId }: Props) {
   const [shipments, setShipments] = useState<ApiShipment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  async function loadShipments() {
-    try {
-      const { shipments: data } = await fetchSwapShipments(accessToken, swapId);
-      setShipments(data);
-    } catch (e: any) {
-      setError(e?.message ?? "Failed to load shipments");
-    } finally {
-      setLoading(false);
-    }
-  }
+  const [refreshKey, setRefreshKey] = useState(0);
+  const reload = () => setRefreshKey((k) => k + 1);
 
   useEffect(() => {
-    loadShipments();
-  }, [swapId]);
+    let cancelled = false;
+    fetchSwapShipments(accessToken, swapId)
+      .then(({ shipments: data }) => { if (!cancelled) setShipments(data); })
+      .catch((e: unknown) => { if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load shipments"); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [accessToken, swapId, refreshKey]);
 
   if (loading) return <p className="text-sm text-muted">Loading shipping info...</p>;
   if (error) return <p className="text-sm text-rose-300">{error}</p>;
@@ -224,7 +220,7 @@ export default function ShippingCard({ swapId, accessToken, myUserId }: Props) {
         {shipment.shippedAt && <p className="text-xs text-muted">Shipped: {new Date(shipment.shippedAt).toLocaleString()}</p>}
         {shipment.deliveredAt && <p className="text-xs text-emerald-400">Delivered: {new Date(shipment.deliveredAt).toLocaleString()}</p>}
 
-        <ShipmentActions shipment={shipment} accessToken={accessToken} onUpdated={loadShipments} isSender={shipment.senderUserId === myUserId} />
+        <ShipmentActions shipment={shipment} accessToken={accessToken} onUpdated={reload} isSender={shipment.senderUserId === myUserId} />
       </div>
     );
   }
