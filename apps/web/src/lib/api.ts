@@ -423,3 +423,110 @@ export function setItemStatus(
 export function fetchMyItems(accessToken: string): Promise<ListItemsResult> {
   return apiFetch("/items/me", accessToken);
 }
+
+// --- Shipping -------------------------------------------------------------
+
+export type ApiUserAddress = {
+  id: string;
+  label: string;
+  line1: string;
+  line2: string | null;
+  city: string;
+  postcode: string;
+  country: string;
+  isDefault: boolean;
+  createdAt: string;
+};
+
+export type ApiShipment = {
+  id: string;
+  swapId: string;
+  senderUserId: string;
+  receiverUserId: string;
+  itemId: string;
+  status: string;
+  addressLine1: string | null;
+  addressLine2: string | null;
+  addressCity: string | null;
+  addressPostcode: string | null;
+  addressCountry: string | null;
+  carrier: string | null;
+  service: string | null;
+  trackingNumber: string | null;
+  trackingUrl: string | null;
+  labelUrl: string | null;
+  postagePence: number | null;
+  postageDeadline: string | null;
+  shipDeadline: string | null;
+  shippedAt: string | null;
+  deliveredAt: string | null;
+  cancelledAt: string | null;
+  item: { id: string; title: string; valuePence: number; images: { url: string }[] };
+  sender: { id: string; name: string; imageUrl: string | null };
+  receiver: { id: string; name: string; imageUrl: string | null };
+  payment: { id: string; status: string; amountPence: number } | null;
+  createdAt: string;
+};
+
+export type ApiShippingRate = {
+  carrier: string;
+  service: string;
+  pricePence: number;
+  estimatedDays: number;
+};
+
+export function fetchAddresses(accessToken: string): Promise<{ addresses: ApiUserAddress[] }> {
+  return apiFetch("/addresses", accessToken);
+}
+
+export function createAddress(
+  accessToken: string,
+  input: { label: string; line1: string; line2?: string; city: string; postcode: string; country?: string; isDefault?: boolean },
+): Promise<{ address: ApiUserAddress }> {
+  return apiSend("/addresses", accessToken, "POST", input) as Promise<{ address: ApiUserAddress }>;
+}
+
+export function updateAddress(
+  accessToken: string,
+  addressId: string,
+  input: Partial<{ label: string; line1: string; line2: string | null; city: string; postcode: string; country: string; isDefault: boolean }>,
+): Promise<{ address: ApiUserAddress }> {
+  return apiSend(`/addresses/${addressId}`, accessToken, "PATCH", input) as Promise<{ address: ApiUserAddress }>;
+}
+
+export function deleteAddress(accessToken: string, addressId: string): Promise<{ ok: boolean }> {
+  return apiSend(`/addresses/${addressId}`, accessToken, "DELETE") as Promise<{ ok: boolean }>;
+}
+
+export function fetchSwapShipments(accessToken: string, swapId: string): Promise<{ shipments: ApiShipment[] }> {
+  return apiFetch(`/swaps/${swapId}/shipments`, accessToken);
+}
+
+export function fetchShipment(accessToken: string, id: string): Promise<{ shipment: ApiShipment }> {
+  return apiFetch(`/shipments/${id}`, accessToken);
+}
+
+export function fetchShipmentRates(accessToken: string, id: string): Promise<{ rates: ApiShippingRate[] }> {
+  return apiFetch(`/shipments/${id}/rates`, accessToken);
+}
+
+export function purchaseLabel(
+  accessToken: string,
+  shipmentId: string,
+  carrier: string,
+  service: string,
+): Promise<{ shipment: ApiShipment }> {
+  return apiSend(`/shipments/${shipmentId}/label`, accessToken, "POST", { carrier, service }) as Promise<{ shipment: ApiShipment }>;
+}
+
+export function shipShipment(accessToken: string, shipmentId: string): Promise<{ shipment: ApiShipment }> {
+  return apiSend(`/shipments/${shipmentId}/ship`, accessToken, "POST") as Promise<{ shipment: ApiShipment }>;
+}
+
+export function deliverShipment(accessToken: string, shipmentId: string): Promise<{ shipment: ApiShipment }> {
+  return apiSend(`/shipments/${shipmentId}/deliver`, accessToken, "POST") as Promise<{ shipment: ApiShipment }>;
+}
+
+export function cancelShipmentApi(accessToken: string, shipmentId: string): Promise<{ shipment: ApiShipment }> {
+  return apiSend(`/shipments/${shipmentId}/cancel`, accessToken, "POST") as Promise<{ shipment: ApiShipment }>;
+}

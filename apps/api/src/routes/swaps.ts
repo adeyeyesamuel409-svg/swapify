@@ -1,9 +1,10 @@
 import { FastifyInstance, FastifyPluginAsync } from 'fastify';
-import { ItemStatus, PaymentStatus, Prisma, Swap, SwapStatus, prisma } from '@swapify/db';
+import { ItemStatus, PaymentStatus, Prisma, Swap, SwapStatus, prisma, ShipmentStatus } from '@swapify/db';
 import { calculateServiceFee } from '@swapify/shared';
 import { HttpError, assertNoActiveSwap, computeGap, withSerializableRetry } from '../services/swaps.js';
 import { createSwapPaymentCheckout, refundSwapPayment } from '../services/stripe.js';
 import { notify } from '../services/notifications.js';
+import { createSwapShipments, cancelSwapShipments, hasShipmentsInMotion, markDelivered, tryCompleteSwap } from '../services/shipping.js';
 
 const swapParamsSchema = {
   params: {
@@ -56,9 +57,33 @@ async function getParticipantSwap(id: string, userId: string): Promise<Swap | nu
 }
 
 // Shared by cancel and expire: refunds any recorded payment, frees the items,
-// and lands the swap in CANCELLED or EXPIRED. Only valid before either party
-// confirms receipt - once an item is in motion it needs admin help.
+// and lands the swap in CANCELLED or EXPIRED. Only valid before either shipment
+// leaves the warehouse (IN_TRANSIT/DELIVERED) — once in motion, admin help is
+// needed.
+//
+// Concurrency-safe: the transition to the terminal status is an atomic
+// conditional UPDATE (AGREED/PAID + no shipments in motion). Only the instance
+// that wins it performs the refund and item release; a second instance (or the
+// sweeper) observes the swap already settled and gets a 409 instead.
 async function settleCancelledSwap(swap: Swap, finalStatus: SwapStatus): Promise<Swap> {
+  const now = new Date();
+
+  const inMotion = await hasShipmentsInMotion(swap.id);
+  if (inMotion) {
+    throw new HttpError(409, `Cannot ${finalStatus.toLowerCase()}: swap is already in motion`);
+  }
+
+  const claimed = await prisma.swap.updateMany({
+    where: {
+      id: swap.id,
+      status: { in: [SwapStatus.AGREED, SwapStatus.PAID] },
+    },
+    data: { status: finalStatus, cancelledAt: now },
+  });
+  if (claimed.count === 0) {
+    throw new HttpError(409, `Cannot ${finalStatus.toLowerCase()}: swap is already settled`);
+  }
+
   if (swap.status === SwapStatus.PAID) {
     const payment = await prisma.payment.findUnique({ where: { swapId: swap.id } });
     if (payment) {
@@ -66,19 +91,19 @@ async function settleCancelledSwap(swap: Swap, finalStatus: SwapStatus): Promise
     }
   }
 
-  const now = new Date();
-  const updated = await prisma.swap.update({
-    where: { id: swap.id },
-    data: { status: finalStatus, cancelledAt: now },
-    include: swapInclude,
-  });
-
   await prisma.item.updateMany({
     where: { id: { in: [swap.offeringItemId, swap.requestedItemId] } },
     data: { status: ItemStatus.ACTIVE },
   });
 
-  return updated;
+  // Cancel any active shipments (best-effort; shipments may not exist yet)
+  try {
+    await cancelSwapShipments(prisma, swap.id, now);
+  } catch {
+    // Non-fatal: shipments may not exist if swap was cancelled before completion
+  }
+
+  return prisma.swap.findUniqueOrThrow({ where: { id: swap.id }, include: swapInclude });
 }
 
 const swapRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
@@ -176,6 +201,7 @@ const swapRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
   });
 
   // The owner of the requested item accepts the swap.
+  // For equal-value swaps, shipments are created atomically at this point.
   app.post('/swaps/:id/accept', { preHandler: [app.authenticate], schema: swapParamsSchema }, async (request) => {
     const user = request.user!;
     const { id } = request.params as { id: string };
@@ -189,7 +215,8 @@ const swapRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
         throw new HttpError(409, `Cannot accept: swap is ${existing.status.toLowerCase()}`);
       }
 
-      return tx.swap.update({
+      const now = new Date();
+      const updated = await tx.swap.update({
         where: { id },
         data: {
           status: SwapStatus.AGREED,
@@ -197,6 +224,13 @@ const swapRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
         },
         include: swapInclude,
       });
+
+      // Equal-value: create both shipment legs immediately at AGREED
+      if (existing.gapPence === 0) {
+        await createSwapShipments(tx, id, now);
+      }
+
+      return updated;
     });
 
     await notify(swap.offeringUserId, 'SWAP_UPDATE', `${user.name} accepted your swap request`, swap.id);
@@ -301,8 +335,14 @@ const swapRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
     return { swap: { ...swap, payment }, checkoutUrl };
   });
 
-  // Each party confirms they received the other's item. When both have, the
-  // swap completes and ownership of both items transfers.
+  // Confirm receipt: the receiver explicitly confirms they received the
+  // other party's item. This is a fallback/manual confirmation — carrier
+  // webhooks are the authoritative delivery signal. After confirming, we
+  // check if both shipments are DELIVERED and, if so, complete the swap
+  // atomically (same as tryCompleteSwap).
+  //
+  // Concurrency-safe: confirmation is a conditional UPDATE; shipment
+  // delivery + completion uses serializable retry with conditional updateMany.
   app.post('/swaps/:id/confirm', { preHandler: [app.authenticate], schema: swapParamsSchema }, async (request) => {
     const user = request.user!;
     const { id } = request.params as { id: string };
@@ -310,60 +350,71 @@ const swapRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
     const swap = await getParticipantSwap(id, user.id);
     if (!swap) throw new HttpError(404, 'Swap not found');
 
-    if (swap.gapPence > 0) {
-      // With a value gap, the payer must have paid before anyone confirms.
-      if (swap.status !== SwapStatus.PAID) {
+    const equalValue = swap.gapPence === 0;
+    const eligibleStatus = equalValue ? SwapStatus.AGREED : SwapStatus.PAID;
+    if (swap.status !== eligibleStatus) {
+      if (swap.gapPence > 0) {
         throw new HttpError(409, 'The gap payment must be completed before confirming receipt');
       }
-    } else if (swap.status !== SwapStatus.AGREED) {
       throw new HttpError(409, `Cannot confirm: swap is ${swap.status.toLowerCase()}`);
     }
 
     const amOffering = swap.offeringUserId === user.id;
     const myField = amOffering ? 'offeringUserConfirmedAt' : 'requestedUserConfirmedAt';
+    const otherField = amOffering ? 'requestedUserConfirmedAt' : 'offeringUserConfirmedAt';
     const now = new Date();
 
-    let updated = swap;
-    if (!swap[myField]) {
-      updated = await prisma.swap.update({
-        where: { id },
-        data: { [myField]: now },
-        include: swapInclude,
-      });
+    // Atomically record my confirmation, only while the swap is still eligible.
+    const claimed = await prisma.swap.updateMany({
+      where: { id, status: eligibleStatus, [myField]: null },
+      data: { [myField]: now },
+    });
+    if (claimed.count === 0) {
+      const current = await prisma.swap.findUnique({ where: { id } });
+      if (!current) throw new HttpError(404, 'Swap not found');
+      if (!current[myField]) {
+        throw new HttpError(409, `Cannot confirm: swap is ${current.status.toLowerCase()}`);
+      }
     }
 
-    const otherConfirmed = amOffering
-      ? updated.requestedUserConfirmedAt
-      : updated.offeringUserConfirmedAt;
+    await prisma.swap.findUniqueOrThrow({ where: { id }, include: swapInclude });
 
-    if (otherConfirmed) {
-      // Both sides received their item - transfer ownership and close the swap.
-      await prisma.$transaction([
-        prisma.item.update({
-          where: { id: updated.offeringItemId },
-          data: { ownerId: updated.requestedUserId, status: ItemStatus.SWAPPED },
-        }),
-        prisma.item.update({
-          where: { id: updated.requestedItemId },
-          data: { ownerId: updated.offeringUserId, status: ItemStatus.SWAPPED },
-        }),
-      ]);
-
-      updated = await prisma.swap.update({
-        where: { id },
-        data: { status: SwapStatus.COMPLETED, completedAt: now },
-        include: swapInclude,
-      });
-
-      const otherParty = amOffering ? updated.requestedUserId : updated.offeringUserId;
-      await notify(otherParty, 'SWAP_UPDATE', 'Swap completed - rate the other party', updated.id);
-      await notify(updated.offeringUserId, 'SWAP_UPDATE', 'Swap completed - rate the other party', updated.id);
-    } else {
-      const otherParty = amOffering ? updated.requestedUserId : updated.offeringUserId;
-      await notify(otherParty, 'SWAP_UPDATE', `${user.name} confirmed they received your item`, updated.id);
+    // Find my incoming shipment (where I am the receiver) and mark delivered
+    // if the carrier hasn't already. This is the manual/fallback confirmation.
+    const incomingShipment = await prisma.shipment.findFirst({
+      where: { swapId: id, receiverUserId: user.id },
+    });
+    if (incomingShipment && incomingShipment.status !== ShipmentStatus.DELIVERED) {
+      if (incomingShipment.status === ShipmentStatus.IN_TRANSIT) {
+        await markDelivered(incomingShipment.id, user.id);
+      }
+      // If still PENDING/LABEL_READY, just record the confirmation — delivery
+      // hasn't happened yet so we can't mark it DELIVERED.
     }
 
-    return { swap: updated };
+    // Reload after delivery update
+    const latest = await prisma.swap.findUniqueOrThrow({ where: { id }, include: swapInclude });
+
+    const otherConfirmed = latest[otherField];
+    if (!otherConfirmed) {
+      const otherParty = amOffering ? latest.requestedUserId : latest.offeringUserId;
+      await notify(otherParty, 'SWAP_UPDATE', `${user.name} confirmed they received your item`, latest.id);
+      return { swap: latest, completed: false };
+    }
+
+    // Both confirmed: attempt completion via shipment-delivery gate.
+    // If both shipments are DELIVERED, tryCompleteSwap atomically completes.
+    // If not, we just return the updated swap — completion waits for delivery.
+    const completed = await tryCompleteSwap(id);
+    const finalSwap = await prisma.swap.findUniqueOrThrow({ where: { id }, include: swapInclude });
+
+    if (completed) {
+      const otherParty = amOffering ? finalSwap.requestedUserId : finalSwap.offeringUserId;
+      await notify(otherParty, 'SWAP_UPDATE', 'Swap completed - rate the other party', finalSwap.id);
+      await notify(finalSwap.offeringUserId, 'SWAP_UPDATE', 'Swap completed - rate the other party', finalSwap.id);
+    }
+
+    return { swap: finalSwap, completed };
   });
 
   // Either party can back out until the swap is in motion (no confirmations yet).
@@ -390,7 +441,8 @@ const swapRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
     }
 
     if (swap.status === SwapStatus.AGREED || swap.status === SwapStatus.PAID) {
-      if (swap.offeringUserConfirmedAt || swap.requestedUserConfirmedAt) {
+      const inMotion = await hasShipmentsInMotion(swap.id);
+      if (inMotion) {
         throw new HttpError(409, 'Swap is already in motion; it cannot be cancelled');
       }
       const updated = await settleCancelledSwap(swap, SwapStatus.CANCELLED);
@@ -416,7 +468,8 @@ const swapRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
     if (swap.expiresAt && swap.expiresAt > new Date()) {
       throw new HttpError(409, 'Swap has not expired yet');
     }
-    if (swap.offeringUserConfirmedAt || swap.requestedUserConfirmedAt) {
+    const inMotion = await hasShipmentsInMotion(swap.id);
+    if (inMotion) {
       throw new HttpError(409, 'Swap is in motion; it cannot be expired');
     }
 

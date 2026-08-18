@@ -90,3 +90,14 @@ export const ITEM_STATUS_LABELS: Record<string, string> = {
   HIDDEN: 'Hidden',
   DELETED: 'Deleted',
 };
+
+export const SHIPMENT_STATUS_LABELS: Record<string, string> = {
+  PENDING: 'Awaiting payment',
+  LABEL_READY: 'Label ready',
+  IN_TRANSIT: 'In transit',
+  DELIVERED: 'Delivered',
+  CANCELLED: 'Cancelled',
+};
+
+export const SHIPMENT_PAYMENT_DEADLINE_DAYS = 3;
+export const SHIPMENT_SHIP_DEADLINE_DAYS = 7;

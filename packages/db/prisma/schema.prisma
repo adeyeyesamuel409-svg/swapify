@@ -43,6 +43,10 @@ model User {
   ratingsGiven    Rating[]       @relation("Rater")
   ratingsReceived Rating[]       @relation("Ratee")
   notifications   Notification[]
+  addresses       UserAddress[]
+  shipmentsSent   Shipment[]     @relation("ShipmentSender")
+  shipmentsReceived Shipment[]   @relation("ShipmentReceiver")
+  shippingPaymentsMade ShippingPayment[] @relation("ShippingPayer")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -107,6 +111,7 @@ model Item {
   images           ItemImage[]
   offeredInSwaps   Swap[]      @relation("OfferedItem")
   requestedInSwaps Swap[]      @relation("RequestedItem")
+  shipments        Shipment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -163,15 +168,13 @@ model Swap {
   status          SwapStatus @default(REQUESTED)
   payment         Payment?
 
-  trackingNumber String?
-  carrier        String?
-
   // Each party confirms they received the other item; swap completes when both have.
   offeringUserConfirmedAt  DateTime?
   requestedUserConfirmedAt DateTime?
 
-  messages Message[]
-  ratings  Rating[]
+  messages   Message[]
+  ratings    Rating[]
+  shipments  Shipment[]
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -212,6 +215,12 @@ model Payment {
   status                  PaymentStatus @default(PENDING)
   stripeCheckoutSessionId String?       @unique
   stripePaymentIntentId   String?
+  // Set once the gap payment has been refunded (swap cancelled/expired after
+  // payment). Makes refunds a durable no-op and guarantees a payment can never
+  // be refunded twice, even if a refund is issued concurrently by two API
+  // instances or retried after a crash.
+  stripeRefundId          String?
+  refundedAt              DateTime?
 
   createdAt DateTime  @default(now())
   paidAt    DateTime?
@@ -292,4 +301,108 @@ model Notification {
   createdAt DateTime @default(now())
 
   @@index([userId, read])
+}
+
+// ---------------------------------------------------------------------------
+// Shipping (post-trade delivery lifecycle)
+// ---------------------------------------------------------------------------
+
+enum ShipmentStatus {
+  PENDING       // shipment created, postage not yet paid
+  LABEL_READY   // postage paid, label available
+  IN_TRANSIT    // carrier has the parcel
+  DELIVERED     // carrier confirms delivery
+  CANCELLED     // label voided / postage refunded / swap cancelled
+}
+
+model UserAddress {
+  id        String  @id @default(cuid())
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label     String
+  line1     String
+  line2     String?
+  city      String
+  postcode  String
+  country   String  @default("GB")
+  isDefault Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Shipment {
+  id              String          @id @default(cuid())
+  swapId          String
+  swap            Swap            @relation(fields: [swapId], references: [id], onDelete: Cascade)
+  senderUserId    String
+  sender          User            @relation("ShipmentSender", fields: [senderUserId], references: [id])
+  receiverUserId  String
+  receiver        User            @relation("ShipmentReceiver", fields: [receiverUserId], references: [id])
+  itemId          String
+  item            Item            @relation(fields: [itemId], references: [id])
+  status          ShipmentStatus  @default(PENDING)
+
+  // Delivery address snapshot (immutable historical copy)
+  addressLine1    String?
+  addressLine2    String?
+  addressCity     String?
+  addressPostcode String?
+  addressCountry  String?
+
+  // Label / provider data
+  carrier               String?
+  service               String?
+  providerShipmentId    String?
+  providerLabelId       String?
+  trackingNumber        String?
+  trackingUrl           String?
+  labelUrl              String?
+  qrCodeUrl             String?
+
+  // Postage cost (GBP pence, integer)
+  postagePence          Int?
+
+  // Deadlines
+  postageDeadline       DateTime?
+  shipDeadline          DateTime?
+
+  // Timestamps
+  shippedAt             DateTime?
+  deliveredAt           DateTime?
+  cancelledAt           DateTime?
+
+  payment               ShippingPayment?
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // One shipment per sender per swap
+  @@unique([swapId, senderUserId])
+  @@index([senderUserId])
+  @@index([receiverUserId])
+  @@index([status])
+  @@index([swapId])
+  @@index([itemId])
+}
+
+model ShippingPayment {
+  id                        String        @id @default(cuid())
+  shipmentId                String        @unique
+  shipment                  Shipment      @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  payerUserId               String
+  payerUser                 User          @relation("ShippingPayer", fields: [payerUserId], references: [id])
+  amountPence               Int
+  status                    PaymentStatus @default(PENDING)
+  stripeCheckoutSessionId   String?       @unique
+  stripePaymentIntentId     String?
+  stripeRefundId            String?
+  refundedAt                DateTime?
+
+  createdAt                 DateTime      @default(now())
+  paidAt                    DateTime?
+
+  @@index([payerUserId, createdAt(sort: Desc)])
 }

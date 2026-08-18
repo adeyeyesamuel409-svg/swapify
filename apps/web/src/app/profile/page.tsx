@@ -4,6 +4,7 @@ import Link from "next/link";
 import { authOptions } from "@/auth";
 import { fetchMe, fetchUserRatings } from "@/lib/api";
 import MyListings from "@/components/MyListings";
+import AddressBookSection from "@/components/AddressBookSection";
 
 export const metadata = { title: "My Profile - Swapify" };
 
@@ -53,6 +54,8 @@ export default async function ProfilePage() {
       </div>
 
       <MyListings accessToken={session.accessToken} />
+
+      <AddressBookSection accessToken={session.accessToken} />
 
       {ratings && ratings.total > 0 && (
         <div className="rounded-card border border-line bg-surface p-6">

@@ -16,6 +16,7 @@ import { wishlistRoutes } from './routes/wishlists.js';
 import { notificationRoutes } from './routes/notifications.js';
 import { adminRoutes } from './routes/admin.js';
 import { uploadRoutes } from './routes/uploads.js';
+import { shippingRoutes } from './routes/shipping.js';
 import { HttpError } from './services/swaps.js';
 import { MAX_IMAGE_BYTES, isLocalStorage, resolveUploadDir } from './services/storage.js';
 import authPlugin from './plugins/auth.js';
@@ -104,6 +105,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   app.register(wishlistRoutes);
   app.register(notificationRoutes);
   app.register(adminRoutes);
+  app.register(shippingRoutes);
 
   return app;
 }

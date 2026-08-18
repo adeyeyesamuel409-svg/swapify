@@ -2,6 +2,7 @@ import Stripe from 'stripe';
 import { PaymentStatus, SwapStatus, prisma } from '@swapify/db';
 import { HttpError } from './swaps.js';
 import { notify } from './notifications.js';
+import { createSwapShipments } from './shipping.js';
 
 // The simulated checkout is a development convenience ONLY. In production a
 // missing Stripe key must never silently take money, so simulation is only
@@ -80,6 +81,15 @@ export async function createSwapPaymentCheckout(
 // Marks a swap's payment as PAID and advances the swap to PAID. Called from the
 // webhook and the dev-confirm flow. Idempotent: the payment's unique session id
 // means the same charge can never be recorded twice.
+//
+// The payment ledger is always kept accurate - if Stripe says the charge
+// succeeded, the Payment row becomes PAID even when the swap is no longer
+// eligible. But the swap only advances to PAID via an atomic conditional
+// update (AGREED -> PAID): a swap that expired or was cancelled concurrently
+// stays terminal and is NEVER resurrected. In that case the recorded payment
+// is picked up by the refund/reconciliation path (refundSwapPayment /
+// reconcileRefunds) and the money is returned, matching the existing
+// cancel/expire-after-pay behaviour.
 export async function markPaymentPaid(
   paymentId: string,
   stripeSessionId: string | null,
@@ -93,14 +103,21 @@ export async function markPaymentPaid(
     throw new Error(`Payment ${paymentId} not found`);
   }
   if (payment.status === PaymentStatus.PAID) {
-    return { id: payment.id, swapId: payment.swapId }; // already recorded
+    // Already recorded — ensure shipments exist (crash-recovery idempotency)
+    const shipmentCount = await prisma.shipment.count({ where: { swapId: payment.swapId } });
+    if (shipmentCount < 2) {
+      await prisma.$transaction(async (tx) => {
+        await createSwapShipments(tx, payment.swapId, new Date());
+      });
+    }
+    return { id: payment.id, swapId: payment.swapId };
   }
 
   if (stripeSessionId && payment.stripeCheckoutSessionId && payment.stripeCheckoutSessionId !== stripeSessionId) {
     throw new Error(`Session mismatch for payment ${paymentId}`);
   }
 
-  await prisma.$transaction([
+  const [, swapClaim] = await prisma.$transaction([
     prisma.payment.update({
       where: { id: payment.id },
       data: {
@@ -110,19 +127,35 @@ export async function markPaymentPaid(
         stripePaymentIntentId: stripePaymentIntentId ?? payment.stripePaymentIntentId,
       },
     }),
-    prisma.swap.update({
-      where: { id: payment.swapId },
+    prisma.swap.updateMany({
+      where: { id: payment.swapId, status: SwapStatus.AGREED },
       data: { status: SwapStatus.PAID },
     }),
   ]);
+  const advanced = swapClaim.count === 1;
 
-  const otherParty =
-    payment.swap.offeringUserId === payment.payerUserId
-      ? payment.swap.requestedUserId
-      : payment.swap.offeringUserId;
+  if (advanced) {
+    // Value-gap: create both shipment legs now that payment is confirmed
+    const createdSwap = await prisma.swap.findUnique({ where: { id: payment.swapId } });
+    if (createdSwap && createdSwap.gapPence > 0) {
+      try {
+        await prisma.$transaction(async (tx) => {
+          await createSwapShipments(tx, payment.swapId, new Date());
+        });
+      } catch {
+        // Best-effort: if shipment creation fails, markPaymentPaid will be
+        // retried and the early-return path handles crash recovery.
+      }
+    }
 
-  await notify(otherParty, 'ESCROW', 'The value-gap payment has been received', payment.swapId);
-  await notify(payment.payerUserId, 'SWAP_UPDATE', 'Payment confirmed - your swap is ready', payment.swapId);
+    const otherParty =
+      payment.swap.offeringUserId === payment.payerUserId
+        ? payment.swap.requestedUserId
+        : payment.swap.offeringUserId;
+
+    await notify(otherParty, 'ESCROW', 'The value-gap payment has been received', payment.swapId);
+    await notify(payment.payerUserId, 'SWAP_UPDATE', 'Payment confirmed - your swap is ready', payment.swapId);
+  }
 
   return { id: payment.id, swapId: payment.swapId };
 }
@@ -130,16 +163,36 @@ export async function markPaymentPaid(
 // Best-effort refund of a swap's gap payment via Stripe. Used when a swap is
 // cancelled or expires after the payer has already paid. Safe to call in the
 // simulated flow (no real charge exists, so it no-ops).
+//
+// Concurrency/idempotency guarantees:
+// - A payment that has already been refunded (`refundedAt` set) is a no-op.
+// - The Stripe refund is created with an idempotency key derived from the
+//   payment id, so a retry (e.g. after a crash) or two instances refunding the
+//   same payment concurrently can never mint a second refund - Stripe returns
+//   the original refund for the same key.
+// - On success the refund is durably recorded on the Payment row with a
+//   conditional update (`where refundedAt: null`), so the result survives a
+//   crash and every later attempt short-circuits before calling Stripe.
 export async function refundSwapPayment(paymentId: string): Promise<void> {
   const payment = await prisma.payment.findUnique({ where: { id: paymentId } });
-  if (!payment || payment.status !== PaymentStatus.PAID || !payment.stripePaymentIntentId) {
+  if (!payment || payment.status !== PaymentStatus.PAID || payment.refundedAt) {
     return;
   }
-  if (!stripeEnabled) {
+  if (!payment.stripePaymentIntentId) {
     return; // simulated payment - nothing was charged
   }
+  if (!stripeEnabled) {
+    return; // simulated flow - no real charge exists
+  }
   try {
-    await getStripe().refunds.create({ payment_intent: payment.stripePaymentIntentId });
+    const refund = await getStripe().refunds.create(
+      { payment_intent: payment.stripePaymentIntentId },
+      { idempotencyKey: `refund-${payment.id}` },
+    );
+    await prisma.payment.updateMany({
+      where: { id: payment.id, refundedAt: null },
+      data: { refundedAt: new Date(), stripeRefundId: refund.id },
+    });
   } catch (err) {
     console.error(`Failed to refund payment ${paymentId}`, err);
   }

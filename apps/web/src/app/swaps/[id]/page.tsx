@@ -8,6 +8,7 @@ import SwapActions from "@/components/SwapActions";
 import SwapChat from "@/components/SwapChat";
 import SwapTimeline from "@/components/SwapTimeline";
 import RatingBox from "@/components/RatingBox";
+import ShippingCard from "@/components/ShippingCard";
 import ItemImage from "@/components/ItemImage";
 import { ArrowRight } from "lucide-react";
 
@@ -109,6 +110,12 @@ export default async function SwapDetailPage({ params }: { params: Promise<{ id:
           <p className="mt-1 text-xs text-muted">
             Expires {new Date(swap.expiresAt).toLocaleString()}
           </p>
+        )}
+
+        {(swap.status === "AGREED" || swap.status === "PAID" || completed) && (
+          <div className="mt-4">
+            <ShippingCard swapId={swap.id} accessToken={session.accessToken!} myUserId={user.id} />
+          </div>
         )}
 
         <SwapActions swap={swap} accessToken={session.accessToken!} myUserId={user.id} />
