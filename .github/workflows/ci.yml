@@ -22,6 +22,11 @@ jobs:
       - name: Generate Prisma client
         run: npm run db:generate
 
+      - name: Build workspace libraries
+        run: |
+          npm run build -w @swapify/db
+          npm run build -w @swapify/shared
+
       - name: Typecheck
         run: npm run typecheck
 
