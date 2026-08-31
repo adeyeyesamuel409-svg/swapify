@@ -8,6 +8,22 @@ on:
 jobs:
   lint-and-typecheck:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: swapify
+          POSTGRES_PASSWORD: swapify
+          POSTGRES_DB: swapify
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U swapify"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://swapify:swapify@localhost:5432/swapify?schema=public
     steps:
       - uses: actions/checkout@v4
 
@@ -34,6 +50,13 @@ jobs:
         run: npm run lint
 
       - name: Verify migrations are clean
-        run: npx prisma migrate diff --from-migrations --to-schema-datamodel packages/db/prisma/schema.prisma --exit-code
+        run: |
+          export PGPASSWORD=swapify
+          psql -h localhost -U swapify -d swapify -c "CREATE DATABASE swapify_shadow;"
+          npx prisma migrate diff \
+            --from-migrations packages/db/prisma/migrations \
+            --to-schema-datamodel packages/db/prisma/schema.prisma \
+            --shadow-database-url "postgresql://swapify:swapify@localhost:5432/swapify_shadow?schema=public" \
+            --exit-code
         # Exit code 0 means no diff: all migrations match the schema.
         # Non-zero means there are unmigrated schema changes — fail CI.
