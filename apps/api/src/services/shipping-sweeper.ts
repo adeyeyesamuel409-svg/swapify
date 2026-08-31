@@ -2,6 +2,9 @@ import { prisma, ShipmentStatus } from '@swapify/db';
 import { getShippingProvider } from './shipping-provider.js';
 import { notify } from './notifications.js';
 import { tryCompleteSwap } from './shipping.js';
+import pino from 'pino';
+
+const log = pino({ name: 'shipping-sweeper', level: process.env.LOG_LEVEL ?? 'info' });
 
 const POLL_INTERVAL_MS = 60 * 1000;
 
@@ -32,8 +35,9 @@ export async function pollInTransitShipments(): Promise<number> {
         // Check if both shipments delivered → complete swap
         await tryCompleteSwap(shipment.swapId);
       }
-    } catch {
+    } catch (err) {
       // Best-effort: skip provider errors and continue polling
+      log.warn({ err, shipmentId: shipment.id }, 'Failed to poll tracking for shipment');
     }
   }
 
@@ -93,8 +97,9 @@ export async function enforceShipDeadlines(): Promise<number> {
     if (shipment.providerShipmentId) {
       try {
         await provider.cancelShipment(shipment.providerShipmentId);
-      } catch {
-        // Best-effort
+      } catch (err) {
+        // Best-effort: log but continue — the DB status is still updated below.
+        log.warn({ err, shipmentId: shipment.id }, 'Failed to cancel shipment with provider');
       }
     }
 
@@ -127,18 +132,24 @@ export async function runShippingSweeper(): Promise<void> {
 
   const errors = results.filter(r => r.status === 'rejected');
   if (errors.length > 0) {
-    console.error('[shipping-sweeper] errors:', errors.map(r => (r as PromiseRejectedResult).reason));
+    log.error({ errors: errors.map(r => (r as PromiseRejectedResult).reason) }, 'Shipping sweeper errors');
   }
 }
 
-export async function startShippingSweeper(): Promise<void> {
-  console.log('[shipping-sweeper] started');
+export async function startShippingSweeper(signal?: AbortSignal): Promise<void> {
+  log.info('Shipping sweeper started');
   while (true) {
+    if (signal?.aborted) break;
     try {
       await runShippingSweeper();
     } catch (err) {
-      console.error('[shipping-sweeper] cycle error:', err);
+      log.error({ err }, 'Shipping sweeper cycle error');
     }
-    await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, POLL_INTERVAL_MS);
+      if (signal) {
+        signal.addEventListener('abort', () => { clearTimeout(timer); resolve(); }, { once: true });
+      }
+    });
   }
 }

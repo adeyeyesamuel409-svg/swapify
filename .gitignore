@@ -36,5 +36,15 @@ infra/data/
 # Uploaded listing images (local storage backend)
 apps/api/uploads/
 
-# QA harness + artifacts (Playwright scripts, screenshots, tokens). Local only.
-qa/
+# QA harness artifacts (Playwright screenshots, tokens, local state). Keep the
+# qa/ directory itself version-controlled so tests run in CI and keep any
+# required reports (qa/PHASE-*-REPORT.md) trackable.
+qa/*.png
+qa/*.zip
+qa/state/
+qa/tokens.json
+qa/screenshots/
+# QA fixture files may contain live auth tokens / DB ids from local runs and
+# must never be committed.
+qa/fixtures.json
+qa/.fixtures.json

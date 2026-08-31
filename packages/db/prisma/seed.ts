@@ -1,7 +1,5 @@
 import { prisma } from '../src/index.js';
-import { Category, Condition, TransactionDirection, TransactionType } from '@prisma/client';
-
-const TOKENS = 1_000_000n; // 1 token = 1,000,000 micro-tokens
+import { Category, Condition } from '@prisma/client';
 
 async function main() {
   const alice = await prisma.user.upsert({
@@ -10,20 +8,6 @@ async function main() {
     create: {
       email: 'alice@example.com',
       name: 'Alice Johnson',
-      wallet: {
-        create: {
-          balanceMicroTokens: 50n * TOKENS,
-          transactions: {
-            create: {
-              type: TransactionType.EARN,
-              direction: TransactionDirection.CREDIT,
-              amountMicroTokens: 50n * TOKENS,
-              balanceAfterMicroTokens: 50n * TOKENS,
-              note: 'Welcome bonus',
-            },
-          },
-        },
-      },
     },
   });
 
@@ -33,20 +17,6 @@ async function main() {
     create: {
       email: 'bob@example.com',
       name: 'Bob Smith',
-      wallet: {
-        create: {
-          balanceMicroTokens: 20n * TOKENS,
-          transactions: {
-            create: {
-              type: TransactionType.PURCHASE,
-              direction: TransactionDirection.CREDIT,
-              amountMicroTokens: 20n * TOKENS,
-              balanceAfterMicroTokens: 20n * TOKENS,
-              note: 'Token purchase (test)',
-            },
-          },
-        },
-      },
     },
   });
 
@@ -60,7 +30,7 @@ async function main() {
       description: 'Great noise-cancelling headphones, very lightly used.',
       category: Category.ELECTRONICS,
       condition: Condition.LIKE_NEW,
-      valueMicroTokens: 180n * TOKENS,
+      valuePence: 18000,
       images: { create: [{ url: 'https://placehold.co/600x400?text=headphones', position: 0 }] },
     },
   });
@@ -75,7 +45,7 @@ async function main() {
       description: 'Console with two joy-cons and dock, barely used.',
       category: Category.ELECTRONICS,
       condition: Condition.GOOD,
-      valueMicroTokens: 250n * TOKENS,
+      valuePence: 25000,
       images: { create: [{ url: 'https://placehold.co/600x400?text=switch', position: 0 }] },
     },
   });

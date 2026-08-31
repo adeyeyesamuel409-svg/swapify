@@ -4,6 +4,10 @@ import { withSerializableRetry } from './swaps.js';
 import { AddressSnapshot, getShippingProvider } from './shipping-provider.js';
 import { notify } from './notifications.js';
 import { SHIPMENT_PAYMENT_DEADLINE_DAYS, SHIPMENT_SHIP_DEADLINE_DAYS } from '@swapify/shared';
+import { releaseValueGap, notifyDisbursementRelease, type ReleasedGapInfo } from './value-gap.js';
+import pino from 'pino';
+
+const log = pino({ name: 'shipping', level: process.env.LOG_LEVEL ?? 'info' });
 
 // ---------------------------------------------------------------------------
 // Create shipments (idempotent — called at AGREED for equal-value, PAID for
@@ -295,8 +299,9 @@ export async function cancelSwapShipments(tx: Prisma.TransactionClient, swapId: 
       try {
         const provider = getShippingProvider();
         await provider.cancelShipment(shipment.providerShipmentId);
-      } catch {
-        // Best-effort
+      } catch (err) {
+        // Best-effort: log but continue — the DB status is still updated below.
+        log.warn({ err, shipmentId: shipment.id }, 'Failed to cancel shipment with provider');
       }
     }
 
@@ -326,6 +331,8 @@ export async function hasShipmentsInMotion(swapId: string): Promise<boolean> {
 // ---------------------------------------------------------------------------
 
 export async function tryCompleteSwap(swapId: string): Promise<boolean> {
+  let releasedGap: ReleasedGapInfo | null = null;
+
   const result = await withSerializableRetry(async (tx) => {
     const swap = await tx.swap.findUnique({ where: { id: swapId } });
     if (!swap) return false;
@@ -358,8 +365,31 @@ export async function tryCompleteSwap(swapId: string): Promise<boolean> {
       data: { ownerId: swap.offeringUserId, status: ItemStatus.SWAPPED },
     });
 
+    // Release the value gap ledger (HELD → RELEASED) atomically.
+    // For equal-value swaps this is a no-op (no ValueGap record exists).
+    // For value-gap swaps, this marks the counterparty's funds as payable.
+    // If the release fails, the swap is still COMPLETED but the value gap
+    // remains HELD — it will be retried by reconciliation.
+    try {
+      const gapInfo = await releaseValueGap(tx, swapId);
+      if (gapInfo) releasedGap = gapInfo;
+    } catch (err) {
+      // Non-fatal: the swap completion succeeded. The value gap release is
+      // logged and will be retried by reconcileValueGaps(). The value gap
+      // must NOT be silently lost.
+      log.error({ err, swapId }, 'Failed to release value gap during swap completion');
+    }
+
     return true;
   });
+
+  // Notify disbursement provider OUTSIDE the DB transaction.
+  // The provider abstraction is a placeholder and does not make real network
+  // calls. A future real provider must execute after the DB commit to avoid
+  // long-running transactions and rollback of committed state.
+  if (releasedGap) {
+    await notifyDisbursementRelease(releasedGap);
+  }
 
   if (result) {
     const swap = await prisma.swap.findUniqueOrThrow({ where: { id: swapId } });

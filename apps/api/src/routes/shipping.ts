@@ -11,6 +11,7 @@ import {
   cancelShipment,
 } from '../services/shipping.js';
 import { tryCompleteSwap } from '../services/shipping.js';
+import { isSimulatedProvider } from '../services/shipping-provider.js';
 
 // ---------------------------------------------------------------------------
 // JSON Schemas
@@ -196,7 +197,7 @@ export const shippingRoutes: FastifyPluginAsync = async (app: FastifyInstance) =
   });
 
   // Purchase postage label
-  app.post('/shipments/:id/label', { preHandler: [app.authenticate], schema: purchaseLabelSchema }, async (request) => {
+  app.post('/shipments/:id/label', { preHandler: [app.authenticate], schema: purchaseLabelSchema, config: { rateLimit: { max: 10, timeWindow: 60_000 } } }, async (request) => {
     const user = request.user!;
     const { id } = request.params as { id: string };
     const { carrier, service } = request.body as { carrier: string; service: string };
@@ -235,6 +236,14 @@ export const shippingRoutes: FastifyPluginAsync = async (app: FastifyInstance) =
   // ── Shipping webhook (provider → Swapify) ────────────────────────────────
 
   app.post('/webhooks/shipping', async (request) => {
+    // In production the simulated provider must never be used for webhooks —
+    // its signature verification is a no-op and would allow anyone to forge
+    // delivery confirmations.
+    if (isSimulatedProvider() && process.env.NODE_ENV === 'production') {
+      request.log.error('Shipping webhook received but simulated provider is active in production');
+      throw new HttpError(503, 'Shipping provider not configured');
+    }
+
     const rawBody = request.rawBody;
     const signature = request.headers['x-webhook-signature'] as string ?? '';
 

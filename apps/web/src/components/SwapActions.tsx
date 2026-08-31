@@ -81,14 +81,22 @@ export default function SwapActions({ swap, accessToken, myUserId }: Props) {
       )}
 
       {swap.status === "AGREED" && iAmPayer && swap.gapPence > 0 && (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={pay}
-          className="mt-3 w-full rounded-btn bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition-all hover:bg-emerald-500 disabled:opacity-50"
-        >
-          {busy ? "Opening checkout..." : `Pay ${formatPence(swap.gapPence)}`}
-        </button>
+        <>
+          <p className="mt-3 text-xs text-muted">
+            You pay <span className="font-semibold text-token">{formatPence(swap.gapPence)}</span> value difference
+            {swap.payment && swap.payment.feePence > 0 && (
+              <> + <span className="font-semibold text-token">{formatPence(swap.payment.feePence)}</span> Swapify fee</>
+            )}
+          </p>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={pay}
+            className="mt-2 w-full rounded-btn bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition-all hover:bg-emerald-500 disabled:opacity-50"
+          >
+            {busy ? "Opening checkout..." : `Pay ${formatPence(swap.gapPence + (swap.payment?.feePence ?? 0))}`}
+          </button>
+        </>
       )}
 
       {swap.status === "AGREED" && iAmPayer && swap.gapPence === 0 && !iConfirmed && (
@@ -131,7 +139,12 @@ export default function SwapActions({ swap, accessToken, myUserId }: Props) {
 
       {swap.status === "PAID" && iAmPayer && (
         <p className="mt-2 text-xs text-emerald-400">
-          Payment received. Both sides can confirm receipt to finish the swap.
+          Payment received — value gap held until both items are delivered.
+        </p>
+      )}
+      {swap.status === "PAID" && !iAmPayer && swap.gapPence > 0 && (
+        <p className="mt-2 text-xs text-amber-400">
+          Value difference: {formatPence(swap.gapPence)} — held until both items are delivered.
         </p>
       )}
 

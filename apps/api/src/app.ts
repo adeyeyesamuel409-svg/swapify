@@ -3,6 +3,7 @@ import rawBody from 'fastify-raw-body';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
+import rateLimit from '@fastify/rate-limit';
 import { jsonWithBigInt } from '@swapify/db';
 import { healthRoutes } from './routes/health.js';
 import { authRoutes } from './routes/auth.js';
@@ -17,16 +18,23 @@ import { notificationRoutes } from './routes/notifications.js';
 import { adminRoutes } from './routes/admin.js';
 import { uploadRoutes } from './routes/uploads.js';
 import { shippingRoutes } from './routes/shipping.js';
+import { balanceRoutes } from './routes/balance.js';
+import { connectRoutes } from './routes/connect.js';
+import { withdrawalRoutes } from './routes/withdrawals.js';
+import { wireStripeConnect } from './services/stripe-connect.js';
 import { HttpError } from './services/swaps.js';
 import { MAX_IMAGE_BYTES, isLocalStorage, resolveUploadDir } from './services/storage.js';
 import authPlugin from './plugins/auth.js';
 import { mkdir } from 'node:fs/promises';
+
+const isProduction = process.env.NODE_ENV === 'production';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
     logger: {
       level: process.env.LOG_LEVEL ?? 'info',
     },
+    trustProxy: isProduction,
   });
 
   // Money is stored as integer GBP pence (Int), which JSON.stringify serializes
@@ -34,6 +42,11 @@ export async function buildApp(): Promise<FastifyInstance> {
   // stray BigInt (e.g. a future Prisma aggregate) into a string instead of
   // failing to serialize.
   app.setReplySerializer((payload: unknown) => jsonWithBigInt(payload));
+
+  // Activate the Stripe Connect disbursement provider when Stripe is
+  // configured. Must run before route registration so the provider is
+  // available when ValueGap release notifies the disbursement provider.
+  wireStripeConnect();
 
   // Stripe webhook signature verification needs the raw request body.
   app.register(rawBody);
@@ -58,13 +71,46 @@ export async function buildApp(): Promise<FastifyInstance> {
     });
   }
 
-  // The web app runs on a different origin (localhost:3000) than the API
-  // (localhost:4000), and authenticated calls send an Authorization header,
-  // which triggers CORS preflights. Allow the configured web origin.
+  // CORS: production origins come from environment variables only.
+  // localhost:3000 is permitted only in development for local DX.
   const webOrigin = process.env.WEB_BASE_URL ?? 'http://localhost:3000';
+  const origins: string[] = [webOrigin];
+  if (!isProduction) {
+    origins.push('http://localhost:3000');
+  }
   await app.register(cors, {
-    origin: [webOrigin, 'http://localhost:3000'],
+    origin: origins,
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+  });
+
+  // ── Rate limiting ────────────────────────────────────────────────────────
+  // Global default: 200 requests/min/IP — generous enough for normal browsing
+  // while blocking brute-force and scripted abuse. Sensitive routes get
+  // tighter per-route limits applied via route-level config.
+  await app.register(rateLimit, {
+    max: 200,
+    timeWindow: 60 * 1000,
+    addHeadersOnExceeding: { 'x-ratelimit-limit': true, 'x-ratelimit-remaining': true },
+    addHeaders: { 'x-ratelimit-limit': true, 'x-ratelimit-remaining': true, 'retry-after': true },
+    errorResponseBuilder: (_request, context) => ({
+      error: 'Too many requests — please try again later',
+      statusCode: 429,
+      retryAfter: Math.ceil(context.ttl / 1000),
+    }),
+  });
+
+  // ── Security headers ─────────────────────────────────────────────────────
+  // Applied via an onRequest hook so they are present on every response
+  // without adding a new dependency.
+  app.addHook('onRequest', async (_request, reply) => {
+    reply.header('X-Content-Type-Options', 'nosniff');
+    reply.header('X-Frame-Options', 'DENY');
+    reply.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+    reply.header('X-XSS-Protection', '0'); // Modern browsers: disabled in favour of CSP
+    reply.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    if (isProduction) {
+      reply.header('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
+    }
   });
 
   // Expected business errors (bad input, conflicts, missing resources) get
@@ -106,6 +152,9 @@ export async function buildApp(): Promise<FastifyInstance> {
   app.register(notificationRoutes);
   app.register(adminRoutes);
   app.register(shippingRoutes);
+  app.register(balanceRoutes);
+  app.register(connectRoutes);
+  app.register(withdrawalRoutes);
 
   return app;
 }

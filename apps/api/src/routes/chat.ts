@@ -47,7 +47,7 @@ const chatRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
   });
 
   // Send a chat message on a swap.
-  app.post('/swaps/:id/messages', { preHandler: [app.authenticate], schema: sendSchema }, async (request) => {
+  app.post('/swaps/:id/messages', { preHandler: [app.authenticate], schema: sendSchema, config: { rateLimit: { max: 30, timeWindow: 60_000 } } }, async (request) => {
     const user = request.user!;
     const { id } = request.params as { id: string };
     const { body } = request.body as { body: string };

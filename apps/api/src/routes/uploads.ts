@@ -13,7 +13,7 @@ const uploadRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
     // build req.rawBody. Our handler consumes the stream itself via parts(),
     // and the async authenticate preHandler would otherwise let that drain
     // finish first, leaving busboy nothing to parse. Skip raw-body capture here.
-    { preHandler: [app.authenticate], config: { rawBody: false } },
+    { preHandler: [app.authenticate], config: { rawBody: false, rateLimit: { max: 20, timeWindow: 60_000 } } },
     async (request, reply) => {
     const files: { url: string }[] = [];
     let imageCount = 0;

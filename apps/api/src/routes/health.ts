@@ -2,28 +2,23 @@ import { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { prisma } from '@swapify/db';
 
 const healthRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
-  app.get('/', async () => ({
-    name: 'Swapify API',
-    version: '0.1.0',
-    docs: 'Open the web app at http://localhost:3000',
-    endpoints: ['/health', '/items', '/items/:id', '/auth/me'],
-  }));
-
-  app.get('/health', async () => {
+  app.get('/health', async (_request, reply) => {
     let database = 'up';
 
     try {
       await prisma.$queryRaw`SELECT 1`;
     } catch (err) {
-      app.log.error(err);
+      app.log.error(err, 'Health check: database probe failed');
       database = 'down';
     }
 
-    return {
-      status: database === 'up' ? 'ok' : 'degraded',
+    const healthy = database === 'up';
+
+    return reply.code(healthy ? 200 : 503).send({
+      status: healthy ? 'ok' : 'degraded',
       services: { api: 'up', database },
       timestamp: new Date().toISOString(),
-    };
+    });
   });
 };
 

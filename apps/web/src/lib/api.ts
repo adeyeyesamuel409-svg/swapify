@@ -17,6 +17,7 @@ export type ApiUser = {
   bio: string | null;
   imageUrl: string | null;
   admin: { role: string } | null;
+  payoutsDisabled: boolean;
 };
 
 export type ApiItem = {
@@ -185,6 +186,17 @@ export type ApiSwap = {
     feePence: number;
     totalPence: number;
     paidAt: string | null;
+  } | null;
+  valueGap: {
+    id: string;
+    state: string;
+    valueGapPence: number;
+    serviceFeePence: number;
+    payerUserId: string;
+    recipientUserId: string;
+    heldAt: string | null;
+    releasedAt: string | null;
+    refundedAt: string | null;
   } | null;
 };
 
@@ -389,6 +401,11 @@ export type AdminStats = {
   activeSwaps: number;
   paidSwaps: number;
   totalFeesPence: number;
+  valueGaps: {
+    state: string;
+    count: number;
+    totalValueGapPence: number;
+  }[];
 };
 
 export type AdminUser = {
@@ -530,3 +547,158 @@ export function deliverShipment(accessToken: string, shipmentId: string): Promis
 export function cancelShipmentApi(accessToken: string, shipmentId: string): Promise<{ shipment: ApiShipment }> {
   return apiSend(`/shipments/${shipmentId}/cancel`, accessToken, "POST") as Promise<{ shipment: ApiShipment }>;
 }
+
+// ---------------------------------------------------------------------------
+// Balance types and fetchers
+// ---------------------------------------------------------------------------
+
+export type ApiBalance = {
+  availableBalancePence: number;
+  pendingBalancePence: number;
+  currency: string;
+};
+
+export type ApiBalanceEntry = {
+  id: string;
+  type: string;
+  amountPence: number;
+  currency: string;
+  direction: string;
+  referenceType: string;
+  referenceId: string;
+  description: string;
+  createdAt: string;
+};
+
+export function fetchBalance(accessToken: string): Promise<ApiBalance> {
+  return apiFetch("/users/me/balance", accessToken);
+}
+
+export function fetchBalanceTransactions(
+  accessToken: string,
+  params?: { cursor?: string; limit?: number },
+): Promise<{ entries: ApiBalanceEntry[]; nextCursor: string | null }> {
+  const qs = new URLSearchParams();
+  if (params?.cursor) qs.set("cursor", params.cursor);
+  if (params?.limit) qs.set("limit", String(params.limit));
+  const query = qs.toString();
+  return apiFetch(`/users/me/balance/transactions${query ? `?${query}` : ""}`, accessToken);
+}
+
+// ---------------------------------------------------------------------------
+// Stripe Connect — payout setup
+// ---------------------------------------------------------------------------
+
+export type ApiConnectAccount = {
+  connected: boolean;
+  status: "NONE" | "ONBOARDING" | "ACTIVE" | "RESTRICTED" | "DISABLED";
+  stripeAccountId?: string;
+  chargesEnabled?: boolean;
+  payoutsEnabled?: boolean;
+  requirementsDue?: string[];
+  onboardedAt?: string | null;
+};
+
+export function getConnectAccount(accessToken: string): Promise<ApiConnectAccount> {
+  return apiFetch("/users/me/connect/status", accessToken);
+}
+
+export function startConnectOnboarding(
+  accessToken: string,
+): Promise<{ url?: string; status?: string; message?: string }> {
+  return apiSend("/users/me/connect/onboarding", accessToken, "POST") as Promise<{ url?: string; status?: string; message?: string }>;
+}
+
+export function syncConnectAccount(
+  accessToken: string,
+): Promise<{
+  synced: boolean;
+  status?: string;
+  payoutsEnabled?: boolean;
+  payoutMethods?: ApiPayoutMethod[];
+}> {
+  return apiSend("/users/me/connect/sync", accessToken, "POST") as Promise<{
+    synced: boolean;
+    status?: string;
+    payoutsEnabled?: boolean;
+    payoutMethods?: ApiPayoutMethod[];
+  }>;
+}
+
+// ---------------------------------------------------------------------------
+// Payout methods
+// ---------------------------------------------------------------------------
+
+export type ApiPayoutMethod = {
+  id: string;
+  displayName: string;
+  last4: string | null;
+  bankName: string | null;
+  isDefault: boolean;
+  type: string;
+  createdAt: string;
+};
+
+export function getPayoutMethods(
+  accessToken: string,
+): Promise<{ payoutMethods: ApiPayoutMethod[] }> {
+  return apiFetch("/users/me/connect/payout-methods", accessToken);
+}
+
+// ---------------------------------------------------------------------------
+// Withdrawals
+// ---------------------------------------------------------------------------
+
+export type ApiWithdrawal = {
+  id: string;
+  status: string;
+  amountPence: number;
+  currency: string;
+  stripePayoutId: string | null;
+  createdAt: string;
+  completedAt: string | null;
+  failedAt: string | null;
+  reversalReason: string | null;
+};
+
+export function createWithdrawal(
+  accessToken: string,
+  amountPence: number,
+): Promise<{ withdrawal: ApiWithdrawal }> {
+  return apiSend("/users/me/withdrawals", accessToken, "POST", { amountPence }) as Promise<{
+    withdrawal: ApiWithdrawal;
+  }>;
+}
+
+export function listWithdrawals(
+  accessToken: string,
+  params?: { cursor?: string; limit?: number },
+): Promise<{ withdrawals: ApiWithdrawal[]; nextCursor: string | null }> {
+  const qs = new URLSearchParams();
+  if (params?.cursor) qs.set("cursor", params.cursor);
+  if (params?.limit) qs.set("limit", String(params.limit));
+  const query = qs.toString();
+  return apiFetch(`/users/me/withdrawals${query ? `?${query}` : ""}`, accessToken);
+}
+
+export function cancelWithdrawal(
+  accessToken: string,
+  withdrawalId: string,
+): Promise<{ withdrawal: ApiWithdrawal }> {
+  return apiSend(`/users/me/withdrawals/${withdrawalId}/cancel`, accessToken, "POST") as Promise<{
+    withdrawal: ApiWithdrawal;
+  }>;
+}
+
+// ---------------------------------------------------------------------------
+// Withdrawal status labels
+// ---------------------------------------------------------------------------
+
+export const WITHDRAWAL_STATUS_LABELS: Record<string, string> = {
+  PENDING: "Requested",
+  APPROVED: "Approved",
+  PROCESSING: "Processing",
+  COMPLETED: "Completed",
+  FAILED: "Failed",
+  CANCELLED: "Cancelled",
+};

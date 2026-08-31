@@ -3,6 +3,10 @@ import { PaymentStatus, SwapStatus, prisma } from '@swapify/db';
 import { HttpError } from './swaps.js';
 import { notify } from './notifications.js';
 import { createSwapShipments } from './shipping.js';
+import { allocateValueGap, refundValueGap } from './value-gap.js';
+import pino from 'pino';
+
+const log = pino({ name: 'stripe', level: process.env.LOG_LEVEL ?? 'info' });
 
 // The simulated checkout is a development convenience ONLY. In production a
 // missing Stripe key must never silently take money, so simulation is only
@@ -13,7 +17,7 @@ export const simulationAllowed = !stripeEnabled && !isProduction;
 
 let stripeClient: Stripe | null = null;
 
-function getStripe(): Stripe {
+export function getStripe(): Stripe {
   if (!stripeClient) {
     stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY!);
   }
@@ -135,6 +139,28 @@ export async function markPaymentPaid(
   const advanced = swapClaim.count === 1;
 
   if (advanced) {
+    // Allocate the value gap ledger record atomically.
+    // If the payment has a positive gap, create the ledger entry.
+    // For equal-value swaps (gapPence === 0), no ledger record is created.
+    if (payment.amountPence > 0) {
+      try {
+        await prisma.$transaction(async (tx) => {
+          await allocateValueGap(tx, {
+            paymentId: payment.id,
+            swapId: payment.swapId,
+            payerUserId: payment.payerUserId,
+            valueGapPence: payment.amountPence,
+            serviceFeePence: payment.feePence,
+          });
+        });
+      } catch (err) {
+        log.error({ err, paymentId: payment.id, swapId: payment.swapId }, 'Failed to allocate value gap');
+        // Non-fatal for payment confirmation itself, but the value gap must be
+        // reconciled. The payment is already PAID; the sweeper/reconciliation
+        // will pick up any missing ledger records.
+      }
+    }
+
     // Value-gap: create both shipment legs now that payment is confirmed
     const createdSwap = await prisma.swap.findUnique({ where: { id: payment.swapId } });
     if (createdSwap && createdSwap.gapPence > 0) {
@@ -142,9 +168,10 @@ export async function markPaymentPaid(
         await prisma.$transaction(async (tx) => {
           await createSwapShipments(tx, payment.swapId, new Date());
         });
-      } catch {
+      } catch (err) {
         // Best-effort: if shipment creation fails, markPaymentPaid will be
         // retried and the early-return path handles crash recovery.
+        log.warn({ err, paymentId: payment.id, swapId: payment.swapId }, 'Failed to create shipments after payment');
       }
     }
 
@@ -164,15 +191,24 @@ export async function markPaymentPaid(
 // cancelled or expires after the payer has already paid. Safe to call in the
 // simulated flow (no real charge exists, so it no-ops).
 //
+// Value-gap integration:
+//   1. Before issuing the Stripe refund, the internal value gap ledger is
+//      transitioned to REFUNDED. If the value gap is already RELEASED, the
+//      refund is blocked (requires dispute/recovery workflow).
+//   2. If a Transfer has already been sent to the connected account (value gap
+//      is RELEASED with an externalPayoutRef), the Transfer is reversed BEFORE
+//      refunding the original payment. This pulls funds back from the connected
+//      account to the platform balance so the Stripe refund can succeed.
+//
+// CURRENT REFUND BEHAVIOR: This function refunds the FULL original Stripe
+// payment (value gap + service fee) in a single Stripe refund.
+//
 // Concurrency/idempotency guarantees:
 // - A payment that has already been refunded (`refundedAt` set) is a no-op.
 // - The Stripe refund is created with an idempotency key derived from the
-//   payment id, so a retry (e.g. after a crash) or two instances refunding the
-//   same payment concurrently can never mint a second refund - Stripe returns
-//   the original refund for the same key.
+//   payment id, so a retry can never mint a second refund.
 // - On success the refund is durably recorded on the Payment row with a
-//   conditional update (`where refundedAt: null`), so the result survives a
-//   crash and every later attempt short-circuits before calling Stripe.
+//   conditional update (`where refundedAt: null`).
 export async function refundSwapPayment(paymentId: string): Promise<void> {
   const payment = await prisma.payment.findUnique({ where: { id: paymentId } });
   if (!payment || payment.status !== PaymentStatus.PAID || payment.refundedAt) {
@@ -184,6 +220,58 @@ export async function refundSwapPayment(paymentId: string): Promise<void> {
   if (!stripeEnabled) {
     return; // simulated flow - no real charge exists
   }
+
+  // Refund the value gap ledger first (HELD → REFUNDED).
+  // If the value gap is already RELEASED, we cannot automatically refund —
+  // this requires a dispute/recovery workflow. Log and skip.
+  const valueGapRefunded = await prisma.$transaction(async (tx) => {
+    return refundValueGap(tx, paymentId, 'SWAP_CANCELLED_OR_EXPIRED');
+  });
+  if (!valueGapRefunded) {
+    log.warn(
+      { paymentId, swapId: payment.swapId },
+      'ValueGap refund was not performed — may be RELEASED (requires dispute workflow)',
+    );
+  }
+
+  // If the value gap was RELEASED and a transfer was sent, reverse it first.
+  // This pulls funds back from the connected account so the original payment
+  // can be refunded. The reversal is idempotent (Stripe returns the existing
+  // reversal if one already exists for the same transfer).
+  const valueGap = await prisma.valueGap.findUnique({ where: { paymentId } });
+  if (valueGap?.state === 'RELEASED' && valueGap.externalPayoutRef) {
+    try {
+      const { reverseTransfer } = await import('./stripe-connect.js');
+      await reverseTransfer({
+        transferId: valueGap.externalPayoutRef,
+        amountPence: valueGap.valueGapPence,
+        valueGapId: valueGap.id,
+      });
+      log.info(
+        { paymentId, transferId: valueGap.externalPayoutRef, valueGapId: valueGap.id },
+        'Reversed Stripe transfer before refunding payment',
+      );
+    } catch (err) {
+      log.error(
+        { err, paymentId, transferId: valueGap.externalPayoutRef },
+        'Failed to reverse transfer before refund — aborting refund for safety',
+      );
+      // P0 SAFETY: Do NOT continue with the refund if the transfer reversal
+      // fails. Continuing would result in money leaving the platform without
+      // the corresponding transfer being reversed, causing a net loss.
+      return;
+    }
+  } else if (valueGap?.state === 'RELEASED' && !valueGap.externalPayoutRef) {
+    // RELEASED gap with no transfer reference — anomaly. Do NOT blindly refund
+    // as this could result in a net loss if a transfer exists on Stripe but
+    // was never recorded.
+    log.error(
+      { paymentId, valueGapId: valueGap.id, state: valueGap.state },
+      'ANOMALY: ValueGap is RELEASED but missing externalPayoutRef — refusing refund for safety',
+    );
+    return;
+  }
+
   try {
     const refund = await getStripe().refunds.create(
       { payment_intent: payment.stripePaymentIntentId },
@@ -194,7 +282,7 @@ export async function refundSwapPayment(paymentId: string): Promise<void> {
       data: { refundedAt: new Date(), stripeRefundId: refund.id },
     });
   } catch (err) {
-    console.error(`Failed to refund payment ${paymentId}`, err);
+    log.error({ err, paymentId }, 'Failed to refund payment');
   }
 }
 

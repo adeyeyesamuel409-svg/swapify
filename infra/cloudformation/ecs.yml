@@ -222,6 +222,12 @@ Resources:
           Image: !Ref ApiImage
           Essential: true
           Cpu: 0
+          HealthCheck:
+            Command: ["CMD-SHELL", "node -e \"fetch('http://localhost:4000/health').then(r=>{process.exit(r.ok?0:1)}).catch(()=>process.exit(1))\""]
+            Interval: 30
+            Timeout: 5
+            Retries: 3
+            StartPeriod: 30
           Environment:
             - Name: NODE_ENV
               Value: production
@@ -281,6 +287,12 @@ Resources:
           Image: !Ref WebImage
           Essential: true
           Cpu: 0
+          HealthCheck:
+            Command: ["CMD-SHELL", "node -e \"fetch('http://localhost:3000/').then(r=>{process.exit(r.ok?0:1)}).catch(()=>process.exit(1))\""]
+            Interval: 30
+            Timeout: 5
+            Retries: 3
+            StartPeriod: 30
           Environment:
             - Name: NODE_ENV
               Value: production

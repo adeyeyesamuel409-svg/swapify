@@ -2,9 +2,12 @@ import { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { ItemStatus, PaymentStatus, Prisma, Swap, SwapStatus, prisma, ShipmentStatus } from '@swapify/db';
 import { calculateServiceFee } from '@swapify/shared';
 import { HttpError, assertNoActiveSwap, computeGap, withSerializableRetry } from '../services/swaps.js';
-import { createSwapPaymentCheckout, refundSwapPayment } from '../services/stripe.js';
+import { createSwapPaymentCheckout, getStripe, stripeEnabled, refundSwapPayment } from '../services/stripe.js';
 import { notify } from '../services/notifications.js';
 import { createSwapShipments, cancelSwapShipments, hasShipmentsInMotion, markDelivered, tryCompleteSwap } from '../services/shipping.js';
+import pino from 'pino';
+
+const log = pino({ name: 'swaps', level: process.env.LOG_LEVEL ?? 'info' });
 
 const swapParamsSchema = {
   params: {
@@ -31,6 +34,19 @@ const swapInclude = {
   offeringUser: { select: { id: true, name: true, imageUrl: true } },
   requestedUser: { select: { id: true, name: true, imageUrl: true } },
   payment: true,
+  valueGap: {
+    select: {
+      id: true,
+      state: true,
+      valueGapPence: true,
+      serviceFeePence: true,
+      payerUserId: true,
+      recipientUserId: true,
+      heldAt: true,
+      releasedAt: true,
+      refundedAt: true,
+    },
+  },
 };
 
 // Origin of the API itself, used to build the simulated checkout redirect.
@@ -40,7 +56,7 @@ function apiOrigin(request: { protocol: string; host: string }): string {
 
 // Origin of the web app, used for payment success/cancel redirects.
 function appOrigin(): string {
-  return process.env.APP_URL ?? 'http://localhost:3000';
+  return process.env.WEB_BASE_URL ?? 'http://localhost:3000';
 }
 
 async function releaseItems(tx: Prisma.TransactionClient, itemIds: string[]) {
@@ -99,8 +115,10 @@ async function settleCancelledSwap(swap: Swap, finalStatus: SwapStatus): Promise
   // Cancel any active shipments (best-effort; shipments may not exist yet)
   try {
     await cancelSwapShipments(prisma, swap.id, now);
-  } catch {
-    // Non-fatal: shipments may not exist if swap was cancelled before completion
+  } catch (err) {
+    // Non-fatal: shipments may not exist if swap was cancelled before completion.
+    // Log for observability — the DB status update below still succeeds.
+    log.warn({ err, swapId: swap.id }, 'Failed to cancel shipments during swap settlement');
   }
 
   return prisma.swap.findUniqueOrThrow({ where: { id: swap.id }, include: swapInclude });
@@ -314,12 +332,33 @@ const swapRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
       ).map((item) => item.valuePence),
     );
 
-    const checkout = await createSwapPaymentCheckout(
-      payment,
-      higherValuePence,
-      `${appOrigin()}/swaps/${swap.id}?paid=1`,
-      `${appOrigin()}/swaps/${swap.id}`,
-    );
+    // P1 #8: Prevent duplicate Checkout sessions. If the payment already has
+    // a Stripe session, check whether it is still usable before creating a new
+    // one. This prevents two concurrent `/pay` calls from creating two active
+    // sessions for the same payment.
+    let checkout;
+    if (payment.stripeCheckoutSessionId && stripeEnabled) {
+      try {
+        const existingSession = await getStripe().checkout.sessions.retrieve(
+          payment.stripeCheckoutSessionId,
+        );
+        // Reuse if the session is still open (not expired/cancelled/complete)
+        if (existingSession.status === 'open' && existingSession.url) {
+          checkout = { simulated: false, url: existingSession.url, sessionId: existingSession.id };
+        }
+      } catch {
+        // Session doesn't exist or can't be retrieved — create a new one
+      }
+    }
+
+    if (!checkout) {
+      checkout = await createSwapPaymentCheckout(
+        payment,
+        higherValuePence,
+        `${appOrigin()}/swaps/${swap.id}?paid=1`,
+        `${appOrigin()}/swaps/${swap.id}`,
+      );
+    }
 
     if (!checkout.simulated && payment.stripeCheckoutSessionId !== checkout.sessionId) {
       await prisma.payment.update({

@@ -97,3 +97,7 @@ export function getShippingProvider(): ShippingProvider {
 export function setShippingProvider(provider: ShippingProvider): void {
   defaultProvider = provider;
 }
+
+export function isSimulatedProvider(): boolean {
+  return defaultProvider.name === 'simulated';
+}

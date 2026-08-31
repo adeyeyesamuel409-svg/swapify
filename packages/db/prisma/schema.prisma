@@ -47,6 +47,18 @@ model User {
   shipmentsSent   Shipment[]     @relation("ShipmentSender")
   shipmentsReceived Shipment[]   @relation("ShipmentReceiver")
   shippingPaymentsMade ShippingPayment[] @relation("ShippingPayer")
+  valueGapsAsPayer     ValueGap[] @relation("ValueGapPayer")
+  valueGapsAsRecipient ValueGap[] @relation("ValueGapRecipient")
+   balanceAccount       BalanceAccount?
+   balanceEntries       BalanceEntry[]
+   adminAdjustmentsMade BalanceEntry[] @relation("AdminAdjustment")
+   connectedAccount     ConnectedAccount?
+   payoutMethods        PayoutMethod[]
+   withdrawals          Withdrawal[]
+
+   // When true, the user cannot request new payouts. Does not affect
+   // in-flight transfers or already-completed payouts.
+   payoutsDisabled Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -175,6 +187,7 @@ model Swap {
   messages   Message[]
   ratings    Rating[]
   shipments  Shipment[]
+  valueGap   ValueGap?
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -195,6 +208,17 @@ enum PaymentStatus {
   PENDING
   PAID
   FAILED
+}
+
+// ---------------------------------------------------------------------------
+// Value-gap internal ledger
+// ---------------------------------------------------------------------------
+
+enum ValueGapState {
+  PENDING   // Payment not yet confirmed
+  HELD      // Payment confirmed; value gap owed to counterparty, not yet released
+  RELEASED  // Swap completed; value gap is payable to counterparty
+  REFUNDED  // Payment refunded; value gap returned to payer
 }
 
 /// The single Stripe payment that settles a swap's value gap plus the Swapify
@@ -222,10 +246,66 @@ model Payment {
   stripeRefundId          String?
   refundedAt              DateTime?
 
+  // Internal value-gap ledger record for this payment (1:1)
+  valueGap                ValueGap?
+
   createdAt DateTime  @default(now())
   paidAt    DateTime?
 
   @@index([payerUserId, createdAt(sort: Desc)])
+}
+
+// ---------------------------------------------------------------------------
+// Value-gap internal ledger
+//
+// Tracks the economic ownership of the value-gap portion of a payment.
+// This is NOT an escrow system — it is an internal accounting record that
+// clearly separates Swapify revenue (feePence) from money owed to the
+// counterparty (valueGapPence).
+//
+// Lifecycle: PENDING → HELD → RELEASED (swap completed) or REFUNDED (cancelled).
+// The recipient is snapshot at creation time so ownership changes cannot
+// redirect funds.
+// ---------------------------------------------------------------------------
+
+model ValueGap {
+  id              String        @id @default(cuid())
+  paymentId       String        @unique
+  payment         Payment       @relation(fields: [paymentId], references: [id])
+  swapId          String        @unique
+  swap            Swap          @relation(fields: [swapId], references: [id])
+  payerUserId     String
+  payer           User          @relation("ValueGapPayer", fields: [payerUserId], references: [id])
+  recipientUserId String
+  recipient       User          @relation("ValueGapRecipient", fields: [recipientUserId], references: [id])
+  // Value-gap amount owed to the counterparty, in GBP pence.
+  valueGapPence   Int
+  // Swapify service fee on this payment, in GBP pence.
+  serviceFeePence Int
+  currency        String        @default("GBP")
+  state           ValueGapState @default(PENDING)
+
+  // Audit timestamps
+  createdAt DateTime @default(now())
+  heldAt    DateTime?
+  releasedAt DateTime?
+  refundedAt DateTime?
+
+  // Reason fields for reconciliation / audit trail
+  releaseReason String?
+  refundReason  String?
+
+  // External payout reference (future use — not implemented yet)
+  externalPayoutRef String?
+
+  // Balance credit generated when this value gap is released (1:1)
+  balanceEntry BalanceEntry?
+
+  @@index([swapId])
+  @@index([payerUserId])
+  @@index([recipientUserId])
+  @@index([state])
+  @@index([createdAt])
 }
 
 // ---------------------------------------------------------------------------
@@ -405,4 +485,232 @@ model ShippingPayment {
   paidAt                    DateTime?
 
   @@index([payerUserId, createdAt(sort: Desc)])
+}
+
+// ---------------------------------------------------------------------------
+// Stripe Connect — connected-account status
+// ---------------------------------------------------------------------------
+
+enum ConnectedAccountStatus {
+  ONBOARDING   // account created, onboarding not yet complete
+  ACTIVE       // payouts enabled, requirements satisfied
+  RESTRICTED   // account has currently_due requirements
+  DISABLED     // account is disabled by Stripe (disabled_reason set)
+}
+
+// ---------------------------------------------------------------------------
+// Payouts — method and withdrawal lifecycle
+// ---------------------------------------------------------------------------
+
+enum PayoutMethodType {
+  BANK_TRANSFER // standard UK bank transfer via Stripe Connect
+}
+
+enum WithdrawalStatus {
+  PENDING      // withdrawal requested, pending validation
+  APPROVED     // validated, awaiting payout creation
+  PROCESSING   // payout created on Stripe connected account
+  COMPLETED    // payout confirmed by Stripe (arrived in bank)
+  FAILED       // payout failed (insufficient funds, bank error)
+  CANCELLED    // user or admin cancelled before payout
+}
+
+// PayoutMethod tracks the destination for withdrawals. Bank account details
+// are stored by Stripe on the connected account — Swapify stores only
+// display metadata (last-4 digits, bank name) for the UI.
+model PayoutMethod {
+  id              String           @id @default(cuid())
+  userId          String
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type            PayoutMethodType @default(BANK_TRANSFER)
+  displayName     String           // e.g. "HSBC ****1234"
+  last4           String?          // last 4 digits of account number
+  bankName        String?          // e.g. "HSBC UK"
+  stripeMethodRef String?          // Stripe payment method reference (not bank details)
+  isDefault       Boolean          @default(true)
+  isActive        Boolean          @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  withdrawals Withdrawal[]
+
+  @@index([userId])
+}
+
+// Withdrawal tracks a request to move funds from the user's Swapify balance
+// to their bank account via Stripe Connect payout.
+//
+// Lifecycle: PENDING → APPROVED → PROCESSING → COMPLETED
+//                                              → FAILED (retryable)
+//
+// Idempotency: Each withdrawal has a unique idempotencyKey used as the
+// Stripe payout idempotency key, preventing duplicate payouts.
+model Withdrawal {
+  id              String           @id @default(cuid())
+  userId          String
+  user            User             @relation(fields: [userId], references: [id])
+  payoutMethodId  String
+  payoutMethod    PayoutMethod     @relation(fields: [payoutMethodId], references: [id])
+
+  // Amount in GBP pence (integer, always positive)
+  amountPence     Int
+  currency        String           @default("GBP")
+  status          WithdrawalStatus @default(PENDING)
+
+  // Stripe payout reference (set after payout created on connected account)
+  stripePayoutId  String?          @unique
+  // Deterministic idempotency key: withdrawal:{withdrawalId}
+  idempotencyKey  String           @unique
+
+  // Fee handling (reserved for future use; currently always 0)
+  feePence        Int              @default(0)
+
+  // Reversal tracking — if payout fails, amount is credited back
+  reversedAt      DateTime?
+  reversalReason  String?
+
+  // Audit timestamps
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  approvedAt      DateTime?
+  processedAt     DateTime?
+  completedAt     DateTime?
+  failedAt        DateTime?
+  cancelledAt     DateTime?
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status])
+  @@index([stripePayoutId])
+}
+
+// ---------------------------------------------------------------------------
+// Pending payout webhook observations
+//
+// When a Stripe payout webhook arrives but the corresponding Withdrawal
+// record does not yet exist (out-of-order delivery), the observation is
+// stored here. The sweeper reconciles these against newly created
+// Withdrawals or directly queries Stripe to determine the payout state.
+// ---------------------------------------------------------------------------
+
+model PayoutWebhookObservation {
+  id              String   @id @default(cuid())
+  stripePayoutId  String   @unique
+  status          String   // "paid" | "failed" | "canceled"
+  arrivalDate     Int?     // Unix timestamp from Stripe
+  consumed        Boolean  @default(false)
+  consumedAt      DateTime?
+  createdAt       DateTime @default(now())
+
+  @@index([stripePayoutId])
+  @@index([consumed])
+}
+
+// ---------------------------------------------------------------------------
+// Internal user balance / settlement ledger
+//
+// BalanceAccount tracks a user's available and pending balance (integer GBP
+// pence). BalanceEntry is the immutable audit log of every balance movement.
+//
+// IMPORTANT: This is internal accounting only. External withdrawals and
+// payment-provider disbursements are intentionally disabled pending business,
+// legal and FCA review.
+// ---------------------------------------------------------------------------
+
+enum BalanceEntryType {
+  VALUE_GAP_CREDIT     // funds released from a completed value-gap swap
+  WITHDRAWAL_DEBIT     // withdrawal requested (future — not implemented)
+  WITHDRAWAL_REVERSAL  // withdrawal reversed / failed (future — not implemented)
+  ADMIN_ADJUSTMENT     // manual admin adjustment (future — not implemented)
+}
+
+enum BalanceEntryDirection {
+  CREDIT
+  DEBIT
+}
+
+model BalanceAccount {
+  id                    String  @id @default(cuid())
+  userId                String  @unique
+  user                  User    @relation(fields: [userId], references: [id])
+  currency              String  @default("GBP")
+  // Sum of all CREDIT entries minus sum of all DEBIT entries.
+  // Must always equal sum(BalanceEntry.amountPence WHERE direction=CREDIT)
+  //                                  minus sum(BalanceEntry.amountPence WHERE direction=DEBIT)
+  // for this account. Reconciliation verifies this invariant.
+  availableBalancePence Int     @default(0)
+  // Funds in pending state (e.g. withdrawal requested but not yet processed).
+  // Currently always 0 — withdrawals are not implemented.
+  pendingBalancePence   Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  entries BalanceEntry[]
+
+  @@index([userId])
+}
+
+model BalanceEntry {
+  id               String                 @id @default(cuid())
+  balanceAccountId String
+  balanceAccount   BalanceAccount         @relation(fields: [balanceAccountId], references: [id])
+  userId           String
+  user             User                   @relation(fields: [userId], references: [id])
+  type             BalanceEntryType
+  amountPence      Int
+  currency         String                 @default("GBP")
+  direction        BalanceEntryDirection
+  referenceType    String                 // e.g. "VALUE_GAP", "WITHDRAWAL", "ADMIN_ADJUSTMENT"
+  referenceId      String                 // e.g. ValueGap.id, withdrawal request id
+  description      String
+
+  // If this entry is a VALUE_GAP_CREDIT, link to the source value gap (1:1).
+  // Null for non-VALUE_GAP entries (withdrawals, admin adjustments, etc.).
+  valueGapId       String?                @unique
+  valueGap         ValueGap?              @relation(fields: [valueGapId], references: [id])
+
+  // Admin adjustment audit fields (populated only for ADMIN_ADJUSTMENT entries).
+  // Required for future admin adjustment implementation per section 9 audit.
+  adminUserId      String?                // admin who performed the adjustment
+  adminUser        User?                  @relation("AdminAdjustment", fields: [adminUserId], references: [id])
+  reason           String?                // business reason for the adjustment
+
+  createdAt DateTime @default(now())
+
+  // Idempotency: each value gap can generate at most one credit entry.
+  // Other reference types (WITHDRAWAL, ADMIN) may have multiple entries.
+  @@unique([referenceType, referenceId])
+  @@index([balanceAccountId, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([valueGapId])
+}
+
+// ---------------------------------------------------------------------------
+// Stripe Connect — connected-account tracking
+//
+// Maps a Swapify user to their Stripe Express connected account. One user
+// has at most one connected account. Stripe handles identity verification,
+// bank-account collection and payouts. Swapify stores only the minimum
+// identifiers and masked display information required for the UI and
+// reconciliation. Regulatory classification of the resulting payment
+// activities requires UK fintech/payment-services legal review.
+// ---------------------------------------------------------------------------
+
+model ConnectedAccount {
+  id              String                  @id @default(cuid())
+  userId          String                  @unique
+  user            User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stripeAccountId String                  @unique
+  status          ConnectedAccountStatus  @default(ONBOARDING)
+  chargesEnabled  Boolean                 @default(false)
+  payoutsEnabled  Boolean                 @default(false)
+  requirementsDue String[]                @default([])
+
+  onboardedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([stripeAccountId])
 }

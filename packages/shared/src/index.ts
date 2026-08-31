@@ -101,3 +101,22 @@ export const SHIPMENT_STATUS_LABELS: Record<string, string> = {
 
 export const SHIPMENT_PAYMENT_DEADLINE_DAYS = 3;
 export const SHIPMENT_SHIP_DEADLINE_DAYS = 7;
+
+export const VALUE_GAP_STATE_LABELS: Record<string, string> = {
+  PENDING: 'Pending',
+  HELD: 'Held',
+  RELEASED: 'Released',
+  REFUNDED: 'Refunded',
+};
+
+export const BALANCE_ENTRY_TYPE_LABELS: Record<string, string> = {
+  VALUE_GAP_CREDIT: 'Value-gap settlement',
+  WITHDRAWAL_DEBIT: 'Withdrawal',
+  WITHDRAWAL_REVERSAL: 'Withdrawal reversed',
+  ADMIN_ADJUSTMENT: 'Admin adjustment',
+};
+
+export const BALANCE_ENTRY_DIRECTION_LABELS: Record<string, string> = {
+  CREDIT: 'Credit',
+  DEBIT: 'Debit',
+};

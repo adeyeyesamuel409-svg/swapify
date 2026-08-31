@@ -5,6 +5,10 @@ import { authOptions } from "@/auth";
 import { fetchMe, fetchUserRatings } from "@/lib/api";
 import MyListings from "@/components/MyListings";
 import AddressBookSection from "@/components/AddressBookSection";
+import BalanceSection from "@/components/BalanceSection";
+import PayoutSetupSection from "@/components/PayoutSetupSection";
+import WithdrawalForm from "@/components/WithdrawalForm";
+import WithdrawalHistory from "@/components/WithdrawalHistory";
 
 export const metadata = { title: "My Profile - Swapify" };
 
@@ -54,6 +58,23 @@ export default async function ProfilePage() {
       </div>
 
       <MyListings accessToken={session.accessToken} />
+
+      <div id="balance-section">
+        <BalanceSection
+          accessToken={session.accessToken}
+          onNavigateToWithdraw={() => {
+            document.getElementById('withdrawal-form')?.scrollIntoView({ behavior: 'smooth' });
+          }}
+        />
+      </div>
+
+      <PayoutSetupSection accessToken={session.accessToken} />
+
+      <div id="withdrawal-form">
+        <WithdrawalForm accessToken={session.accessToken} />
+      </div>
+
+      <WithdrawalHistory accessToken={session.accessToken} />
 
       <AddressBookSection accessToken={session.accessToken} />
 

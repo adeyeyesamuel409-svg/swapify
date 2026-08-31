@@ -22,7 +22,7 @@ export default function SwapTimeline({ swap, myUserId }: Props) {
     { key: "REQUESTED", label: "Requested", hint: "Swap request sent" },
     { key: "AGREED", label: "Agreed", hint: "Owner accepted" },
     ...(hasPaymentStep
-      ? [{ key: "PAID", label: "Paid", hint: "Value-gap payment received" }]
+      ? [{ key: "PAID", label: "Paid", hint: "Value-gap payment held until delivery" }]
       : []),
     { key: "COMPLETED", label: "Completed", hint: "Both items received" },
   ];

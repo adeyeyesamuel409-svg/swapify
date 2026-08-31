@@ -1,0 +1,83 @@
+=== RESPONSIVE QA (77 page×viewport runs) ===
+Real horizontal page scroll (htmlOverflow): 0
+Offscreen decorative elements (no page scroll, clipped by overflow-hidden): 3
+  home@375x812 <div.pointer-events-none.absolute> left=-262 right=638
+  home@375x812 <div.pointer-events-none.absolute> left=-112 right=488
+  home@390x844 <div.pointer-events-none.absolute> left=-255 right=645
+  home@390x844 <div.pointer-events-none.absolute> left=-105 right=495
+  home@768x1024 <div.pointer-events-none.absolute> left=-66 right=834
+Server redirects: 0
+Console/page errors, failed requests, 500s, 4xx resources: 0
+Runs that landed on a different path than requested (client-side redirect): 70
+  browse@375x812: requested browse -> landed /browse
+  browse@390x844: requested browse -> landed /browse
+  browse@768x1024: requested browse -> landed /browse
+  browse@1024x768: requested browse -> landed /browse
+  browse@1280x800: requested browse -> landed /browse
+  browse@1440x900: requested browse -> landed /browse
+  browse@1920x1080: requested browse -> landed /browse
+  browse-filters@375x812: requested browse-filters -> landed /browse?q=camera&sort=value_desc
+  browse-filters@390x844: requested browse-filters -> landed /browse?q=camera&sort=value_desc
+  browse-filters@768x1024: requested browse-filters -> landed /browse?q=camera&sort=value_desc
+  browse-filters@1024x768: requested browse-filters -> landed /browse?q=camera&sort=value_desc
+  browse-filters@1280x800: requested browse-filters -> landed /browse?q=camera&sort=value_desc
+  browse-filters@1440x900: requested browse-filters -> landed /browse?q=camera&sort=value_desc
+  browse-filters@1920x1080: requested browse-filters -> landed /browse?q=camera&sort=value_desc
+  listing-detail@375x812: requested listing-detail -> landed /items/cmsjsu6ou0009i9gcaygvwxn4
+  listing-detail@390x844: requested listing-detail -> landed /items/cmsjsu6ou0009i9gcaygvwxn4
+  listing-detail@768x1024: requested listing-detail -> landed /items/cmsjsu6ou0009i9gcaygvwxn4
+  listing-detail@1024x768: requested listing-detail -> landed /items/cmsjsu6ou0009i9gcaygvwxn4
+  listing-detail@1280x800: requested listing-detail -> landed /items/cmsjsu6ou0009i9gcaygvwxn4
+  listing-detail@1440x900: requested listing-detail -> landed /items/cmsjsu6ou0009i9gcaygvwxn4
+  listing-detail@1920x1080: requested listing-detail -> landed /items/cmsjsu6ou0009i9gcaygvwxn4
+  listing-detail-noimage@375x812: requested listing-detail-noimage -> landed /items/cmshoazdj000bi99cuvny8mqt
+  listing-detail-noimage@390x844: requested listing-detail-noimage -> landed /items/cmshoazdj000bi99cuvny8mqt
+  listing-detail-noimage@768x1024: requested listing-detail-noimage -> landed /items/cmshoazdj000bi99cuvny8mqt
+  listing-detail-noimage@1024x768: requested listing-detail-noimage -> landed /items/cmshoazdj000bi99cuvny8mqt
+  listing-detail-noimage@1280x800: requested listing-detail-noimage -> landed /items/cmshoazdj000bi99cuvny8mqt
+  listing-detail-noimage@1440x900: requested listing-detail-noimage -> landed /items/cmshoazdj000bi99cuvny8mqt
+  listing-detail-noimage@1920x1080: requested listing-detail-noimage -> landed /items/cmshoazdj000bi99cuvny8mqt
+  post@375x812: requested post -> landed /post
+  post@390x844: requested post -> landed /post
+  post@768x1024: requested post -> landed /post
+  post@1024x768: requested post -> landed /post
+  post@1280x800: requested post -> landed /post
+  post@1440x900: requested post -> landed /post
+  post@1920x1080: requested post -> landed /post
+  signin@375x812: requested signin -> landed /signin
+  signin@390x844: requested signin -> landed /signin
+  signin@768x1024: requested signin -> landed /signin
+  signin@1024x768: requested signin -> landed /signin
+  signin@1280x800: requested signin -> landed /signin
+  signin@1440x900: requested signin -> landed /signin
+  signin@1920x1080: requested signin -> landed /signin
+  profile-redirect@375x812: requested profile-redirect -> landed /signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2Fprofile
+  profile-redirect@390x844: requested profile-redirect -> landed /signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2Fprofile
+  profile-redirect@768x1024: requested profile-redirect -> landed /signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2Fprofile
+  profile-redirect@1024x768: requested profile-redirect -> landed /signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2Fprofile
+  profile-redirect@1280x800: requested profile-redirect -> landed /signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2Fprofile
+  profile-redirect@1440x900: requested profile-redirect -> landed /signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2Fprofile
+  profile-redirect@1920x1080: requested profile-redirect -> landed /signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2Fprofile
+  wishlists-redirect@375x812: requested wishlists-redirect -> landed /signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2Fwishlists
+  wishlists-redirect@390x844: requested wishlists-redirect -> landed /signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2Fwishlists
+  wishlists-redirect@768x1024: requested wishlists-redirect -> landed /signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2Fwishlists
+  wishlists-redirect@1024x768: requested wishlists-redirect -> landed /signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2Fwishlists
+  wishlists-redirect@1280x800: requested wishlists-redirect -> landed /signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2Fwishlists
+  wishlists-redirect@1440x900: requested wishlists-redirect -> landed /signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2Fwishlists
+  wishlists-redirect@1920x1080: requested wishlists-redirect -> landed /signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2Fwishlists
+  swaps-redirect@375x812: requested swaps-redirect -> landed /signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2Fswaps
+  swaps-redirect@390x844: requested swaps-redirect -> landed /signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2Fswaps
+  swaps-redirect@768x1024: requested swaps-redirect -> landed /signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2Fswaps
+  swaps-redirect@1024x768: requested swaps-redirect -> landed /signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2Fswaps
+  swaps-redirect@1280x800: requested swaps-redirect -> landed /signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2Fswaps
+  swaps-redirect@1440x900: requested swaps-redirect -> landed /signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2Fswaps
+  swaps-redirect@1920x1080: requested swaps-redirect -> landed /signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2Fswaps
+  admin-redirect@375x812: requested admin-redirect -> landed /signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2Fadmin
+  admin-redirect@390x844: requested admin-redirect -> landed /signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2Fadmin
+  admin-redirect@768x1024: requested admin-redirect -> landed /signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2Fadmin
+  admin-redirect@1024x768: requested admin-redirect -> landed /signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2Fadmin
+  admin-redirect@1280x800: requested admin-redirect -> landed /signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2Fadmin
+  admin-redirect@1440x900: requested admin-redirect -> landed /signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2Fadmin
+  admin-redirect@1920x1080: requested admin-redirect -> landed /signin?callbackUrl=http%3A%2F%2Flocalhost%3A3000%2Fadmin
+Console warnings (may be dev/build noise): 0
+Header/main overlap: 0

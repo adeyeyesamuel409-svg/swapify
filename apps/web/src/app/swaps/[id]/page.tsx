@@ -103,8 +103,25 @@ export default async function SwapDetailPage({ params }: { params: Promise<{ id:
             Value gap: <span className="font-semibold text-token">{formatPence(gapPence)}</span>
           </p>
         )}
-        {swap.payment?.status === "PAID" && (
-          <p className="mt-1 text-xs text-emerald-400">Payment received - value gap settled.</p>
+        {swap.valueGap && swap.valueGap.state === "HELD" && (
+          <p className="mt-1 text-xs text-amber-400">
+            Value difference: {formatPence(swap.valueGap.valueGapPence)} — pending until both items are delivered.
+          </p>
+        )}
+        {swap.valueGap && swap.valueGap.state === "RELEASED" && (
+          <p className="mt-1 text-xs text-emerald-400">
+            Value difference: {formatPence(swap.valueGap.valueGapPence)} — released. External payout pending.
+          </p>
+        )}
+        {swap.valueGap && swap.valueGap.state === "REFUNDED" && (
+          <p className="mt-1 text-xs text-muted">
+            Value difference: {formatPence(swap.valueGap.valueGapPence)} — refunded to payer.
+          </p>
+        )}
+        {swap.payment?.status === "PAID" && swap.payment.feePence > 0 && (
+          <p className="mt-1 text-xs text-muted">
+            Swapify fee: {formatPence(swap.payment.feePence)}
+          </p>
         )}
         {swap.expiresAt && active && (
           <p className="mt-1 text-xs text-muted">
