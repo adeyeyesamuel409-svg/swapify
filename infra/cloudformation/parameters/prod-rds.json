@@ -1,0 +1,14 @@
+[
+  { "ParameterKey": "EnvName", "ParameterValue": "prod" },
+  { "ParameterKey": "VpcId", "ParameterValue": "REPLACE_FROM_NETWORKING_OUTPUT" },
+  { "ParameterKey": "DbSubnetIds", "ParameterValue": "REPLACE_FROM_NETWORKING_OUTPUT" },
+  { "ParameterKey": "RdsSecurityGroupId", "ParameterValue": "REPLACE_FROM_NETWORKING_OUTPUT" },
+  { "ParameterKey": "DbEngineVersion", "ParameterValue": "16.15" },
+  { "ParameterKey": "DbInstanceClass", "ParameterValue": "db.t4g.small" },
+  { "ParameterKey": "AllocatedStorage", "ParameterValue": "20" },
+  { "ParameterKey": "DbName", "ParameterValue": "swapify" },
+  { "ParameterKey": "MasterUsername", "ParameterValue": "swapify_app" },
+  { "ParameterKey": "BackupRetentionDays", "ParameterValue": "7" },
+  { "ParameterKey": "DeletionProtection", "ParameterValue": "true" },
+  { "ParameterKey": "MultiAz", "ParameterValue": "false" }
+]

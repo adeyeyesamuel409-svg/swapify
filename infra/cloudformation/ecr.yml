@@ -1,0 +1,85 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Swapify - ECR repositories for API and web images (immutable tags, scan on push)"
+
+Parameters:
+  EnvName:
+    Type: String
+    Default: prod
+    Description: Environment name used in resource tags.
+
+Resources:
+  ApiRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: swapify-api
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      ImageTagMutability: IMMUTABLE
+      EncryptionConfiguration:
+        EncryptionType: AES256
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Expire untagged images after 14 days",
+                "selection": {
+                  "tagStatus": "untagged",
+                  "countType": "sinceImagePushed",
+                  "countUnit": "days",
+                  "countNumber": 14
+                },
+                "action": { "type": "expire" }
+              }
+            ]
+          }
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvName
+
+  WebRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: swapify-web
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      ImageTagMutability: IMMUTABLE
+      EncryptionConfiguration:
+        EncryptionType: AES256
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Expire untagged images after 14 days",
+                "selection": {
+                  "tagStatus": "untagged",
+                  "countType": "sinceImagePushed",
+                  "countUnit": "days",
+                  "countNumber": 14
+                },
+                "action": { "type": "expire" }
+              }
+            ]
+          }
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvName
+
+Outputs:
+  ApiRepositoryUri:
+    Description: Image URI base for the API, e.g. <account>.dkr.ecr.us-east-1.amazonaws.com/swapify-api:<git-sha>
+    Value: !GetAtt ApiRepository.RepositoryUri
+  ApiRepositoryArn:
+    Value: !GetAtt ApiRepository.Arn
+  ApiRepositoryName:
+    Value: !Ref ApiRepository
+  WebRepositoryUri:
+    Description: Image URI base for the web app, e.g. <account>.dkr.ecr.us-east-1.amazonaws.com/swapify-web:<git-sha>
+    Value: !GetAtt WebRepository.RepositoryUri
+  WebRepositoryArn:
+    Value: !GetAtt WebRepository.Arn
+  WebRepositoryName:
+    Value: !Ref WebRepository

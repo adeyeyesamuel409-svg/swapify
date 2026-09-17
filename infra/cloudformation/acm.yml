@@ -1,0 +1,32 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Swapify - ACM certificates for swapify.app and api.swapify.app (DNS validation, us-east-1)"
+
+Parameters:
+  EnvName:
+    Type: String
+    Default: prod
+    Description: Environment name used in resource tags.
+  DomainName:
+    Type: String
+    Default: swapify.app
+    Description: Primary domain the certificate covers.
+  SubjectAlternativeNames:
+    Type: List<String>
+    Default: "api.swapify.app"
+    Description: Additional domains covered by the certificate.
+
+Resources:
+  Certificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Ref DomainName
+      SubjectAlternativeNames: !Ref SubjectAlternativeNames
+      ValidationMethod: DNS
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvName
+
+Outputs:
+  CertificateArn:
+    Description: ACM certificate ARN to pass to the ECS (ALB) stack.
+    Value: !Ref Certificate

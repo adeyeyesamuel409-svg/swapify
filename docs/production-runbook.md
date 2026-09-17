@@ -12,20 +12,45 @@ connected accounts, then payouts to the user's bank).
 
 ## 1. Exact deployment sequence
 
-Follow these steps **in order**. Steps a–d can be done in parallel by
+Follow these steps **in order**. Infrastructure provisioning (step 0) must
+complete before secrets (step a); steps a–d can then run in parallel by
 different team members; step e must complete before step g.
+
+### 0. Provision AWS infrastructure (one-time, CloudFormation)
+
+Deploy the CloudFormation stacks in this order (templates in
+`infra/cloudformation/`, parameter files in
+`infra/cloudformation/parameters/`). All stacks use `prod` as `EnvName` and
+live in `us-east-1` (account 588170396448).
+
+| Order | Stack (`aws cloudformation deploy --stack-name …`) | Template / parameters | Notes |
+|---|---|---|---|
+| 1 | `swapify-networking` | `networking.yml` + `parameters/prod-networking.json` | VPC `10.0.0.0/16`, public/app/db subnets, 1 NAT (or 3 with `NatGateways=3`), all security groups |
+| 2 | `swapify-ecr` | `ecr.yml` + `parameters/prod-ecr.json` | `swapify-api`, `swapify-web` (immutable tags, scan on push) |
+| 3 | `swapify-acm` | `acm.yml` + `parameters/prod-acm.json` | `swapify.app` + `api.swapify.app` (DNS validation). Domains are not in this account's Route 53, so the stack will sit in `CREATE_IN_PROGRESS`; run `aws acm describe-certificate --certificate-arn <arn> --region us-east-1` to read the `DomainValidationOptions` CNAMEs and add them at the registrar (see step g) before continuing |
+| 4 | `swapify-rds` | `rds.yml` + `parameters/prod-rds.json` | Fill `VpcId`/`DbSubnetIds`/`RdsSecurityGroupId` from networking stack outputs; PostgreSQL 16, private-only, RDS-managed password secret |
+| 5 | `swapify-storage` | `storage.yml` (**already deployed** — do not recreate) | Outputs: `S3Bucket`, `CdnBaseUrl`, `ApiStorageAccessPolicyArn` |
+| 6 | `swapify-cognito` | `cognito.yml` (**already deployed** — do not recreate) | Outputs: pool, client, domain, issuer |
+| 7 | — | Secrets Manager | Populate the five secrets (step a) |
+
+`swapify-networking` owns **all** security groups (`LoadBalancerSecurityGroupId`,
+`ApiSecurityGroupId`, `WebSecurityGroupId`, `RdsSecurityGroupId`). Pass its
+outputs to the ECS and RDS stacks — no security groups are defined in `ecs.yml`.
+Deploy ECS (`swapify-ecs`, step f) last; it needs networking, ECR URIs, the ACM
+certificate ARN, storage/cognito outputs and all five secret ARNs.
 
 ### a. Configure production secrets (one-time)
 
-Populate **AWS Secrets Manager** with the five secrets referenced by `ecs.yml`:
+Populate **AWS Secrets Manager** with the five secrets referenced by `ecs.yml`.
+The **secret name** is the contract passed as the `*SecretArn` parameters:
 
-| Secret | Value |
+| Secret name | Value |
 |---|---|
-| `DATABASE_URL` | Postgres connection string (`postgresql://...?schema=public`) |
-| `STRIPE_SECRET_KEY` | Stripe **live** secret key (`sk_live_...`) |
-| `STRIPE_WEBHOOK_SECRET` | Webhook signing secret from step b (`whsec_...`) |
-| `NEXTAUTH_SECRET` | `openssl rand -base64 32` |
-| `COGNITO_CLIENT_SECRET` | From Cognito pool (step d) |
+| `swapify/database-url` | Postgres connection string. Build from the RDS stack outputs after step 0: `RdsEndpoint`, `RdsPort` (5432), `RdsDbName`, and the RDS-generated password from `RdsMasterUserSecretArn` (fetch the JSON secret at deploy time, take `.password`; never print it). `postgresql://swapify_app:<password>@<endpoint>:5432/swapify?schema=public` |
+| `swapify/stripe/secret-key` | Stripe **live** secret key (`sk_live_...`) |
+| `swapify/stripe/webhook-secret` | Webhook signing secret from step b (`whsec_...`) |
+| `swapify/web/nextauth-secret` | `openssl rand -base64 32` |
+| `swapify/web/cognito-client-secret` | From Cognito pool (step d) |
 
 ### b. Configure Stripe LIVE mode (one-time)
 
@@ -39,7 +64,7 @@ Populate **AWS Secrets Manager** with the five secrets referenced by `ecs.yml`:
      `payout.failed`, `payout.canceled`, `transfer.failed`, `transfer.updated`,
      `charge.dispute.created`
    - Copy the **signing secret** (`whsec_...`) into Secrets Manager as
-     `STRIPE_WEBHOOK_SECRET`.
+     `swapify/stripe/webhook-secret`.
 4. Enable Stripe Connect payouts for the account.
 
 ### c. Deploy database migrations (CRITICAL — before API deploy)
@@ -78,27 +103,53 @@ CI runs `prisma migrate diff --from-migrations --to-schema-datamodel
 
 1. Create the Cognito user pool + app client (via `cognito.yml` or manual).
 2. Note the `UserPoolId`, `ClientId`, `ClientSecret`, and issuer URL.
-3. Store `COGNITO_CLIENT_SECRET` in Secrets Manager.
+3. Store `COGNITO_CLIENT_SECRET` in Secrets Manager as `swapify/web/cognito-client-secret`.
 4. Set `COGNITO_USER_POOL_ID`, `COGNITO_CLIENT_ID`, `COGNITO_REGION` in the
    ECS task environment.
 
 ### e. Build and push Docker images
 
+Tag images with the **immutable git commit SHA** (`ApiImage`/`WebImage`)
+matched to the source being released; never use `latest` (ECR repositories
+`swapify-api` / `swapify-web` are immutable-tag).
+
 ```bash
+SHA=$(git rev-parse --short HEAD)
+ECR_API=<account>.dkr.ecr.us-east-1.amazonaws.com/swapify-api
+ECR_WEB=<account>.dkr.ecr.us-east-1.amazonaws.com/swapify-web
+
 # API
-docker build -f apps/api/Dockerfile -t $ECR/api:latest .
-docker push $ECR/api:latest
+docker build -f apps/api/Dockerfile -t "$ECR_API:$SHA" .
+docker push "$ECR_API:$SHA"
 
 # Web (requires NEXT_PUBLIC_IMAGE_BASE_URL set at build time if using CDN)
 docker build -f apps/web/Dockerfile \
   --build-arg NEXT_PUBLIC_IMAGE_BASE_URL=https://<cloudfront>.cloudfront.net \
-  -t $ECR/web:latest .
-docker push $ECR/web:latest
+  -t "$ECR_WEB:$SHA" .
+docker push "$ECR_WEB:$SHA"
 ```
 
 ### f. Deploy ECS stack
 
-Update the CloudFormation stack with the new `ApiImage` / `WebImage` parameters.
+```bash
+aws cloudformation deploy --stack-name swapify-ecs \
+  --template-file infra/cloudformation/ecs.yml \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --parameter-overrides \
+    VpcId=<from swapify-networking> \
+    LoadBalancerSubnets=<PublicSubnetIds> \
+    ApiSubnets=<AppSubnetIds> WebSubnets=<AppSubnetIds> \
+    LoadBalancerSecurityGroupId=<…> ApiSecurityGroupId=<…> WebSecurityGroupId=<…> \
+    ApiImage="$ECR_API:$SHA" WebImage="$ECR_WEB:$SHA" \
+    ApiDomainName=api.swapify.app WebDomainName=swapify.app \
+    CertificateArn=<from swapify-acm> \
+    CognitoUserPoolId=<…> CognitoClientId=<…> CognitoIssuer=<…> \
+    S3Bucket=<from swapify-storage> CdnBaseUrl=<…> StorageAccessPolicyArn=<…> \
+    DatabaseUrlSecretArn=<swapify/database-url ARN> \
+    StripeSecretKeySecretArn=<…> StripeWebhookSecretSecretArn=<…> \
+    NextAuthSecretSecretArn=<…> CognitoClientSecretSecretArn=<…>
+```
+
 ECS performs a rolling update; the ALB health check gates traffic:
 
 - API: `GET /health` → expect 200
@@ -108,7 +159,12 @@ ECS performs a rolling update; the ALB health check gates traffic:
 
 Point `ApiDomainName` and `WebDomainName` at the ALB DNS name (Route 53 /
 CNAME). The ALB HTTPS listener uses the ACM certificate; HTTP redirects to
-HTTPS (301).
+HTTPS (301). Because the domains are not hosted in this account's Route 53,
+complete certificate validation first: read the CNAMEs from
+`aws acm describe-certificate --certificate-arn <arn>` (the `swapify-acm` stack
+stays in `CREATE_IN_PROGRESS` until validation), create them at the registrar,
+wait for the certificate to reach `ISSUED`, then point `swapify.app` and
+`api.swapify.app` → `LoadBalancerDnsName`.
 
 ### h. Verify health
 
@@ -172,7 +228,7 @@ never enabled in production.
 Register a webhook in the Stripe Dashboard (or via `cli listen` for test):
 
 - **Endpoint URL:** `https://<ApiDomainName>/stripe/webhook`
-- **Signing secret:** paste the `whsec_...` into `STRIPE_WEBHOOK_SECRET`.
+- **Signing secret:** paste the `whsec_...` into `swapify/stripe/webhook-secret`.
 - **Events to subscribe** (the handler in `apps/api/src/routes/stripe.ts`
   processes these; any others are logged as unhandled and are safe no-ops):
   - `checkout.session.completed`

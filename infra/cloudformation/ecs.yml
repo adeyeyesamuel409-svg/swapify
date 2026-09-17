@@ -13,12 +13,21 @@ Parameters:
     Type: List<AWS::EC2::Subnet::Id>
   WebSubnets:
     Type: List<AWS::EC2::Subnet::Id>
+  LoadBalancerSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: From the networking stack output LoadBalancerSecurityGroupId.
+  ApiSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: From the networking stack output ApiSecurityGroupId.
+  WebSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: From the networking stack output WebSecurityGroupId.
   ApiImage:
     Type: String
-    Description: ECR image URI for the API (build with npm run build -w @swapify/api; NODE_ENV=production).
+    Description: 'ECR image URI for the API: <account>.dkr.ecr.us-east-1.amazonaws.com/swapify-api:<git-sha> (build with npm run build -w @swapify/api; NODE_ENV=production).'
   WebImage:
     Type: String
-    Description: ECR image URI for the web app (build with NEXT_PUBLIC_IMAGE_BASE_URL set to the CDN base URL).
+    Description: 'ECR image URI for the web app: <account>.dkr.ecr.us-east-1.amazonaws.com/swapify-web:<git-sha> (build with NEXT_PUBLIC_IMAGE_BASE_URL set to the CDN base URL).'
   ApiDomainName:
     Type: String
     Description: Public host for the API, e.g. api.swapify.app
@@ -69,60 +78,24 @@ Parameters:
     Description: ApiStorageAccessPolicyArn from the storage stack.
   DatabaseUrlSecretArn:
     Type: String
+    Description: Secrets Manager ARN of swapify/database-url.
   StripeSecretKeySecretArn:
     Type: String
+    Description: Secrets Manager ARN of swapify/stripe/secret-key.
   StripeWebhookSecretSecretArn:
     Type: String
+    Description: Secrets Manager ARN of swapify/stripe/webhook-secret.
   NextAuthSecretSecretArn:
     Type: String
+    Description: Secrets Manager ARN of swapify/web/nextauth-secret.
   CognitoClientSecretSecretArn:
     Type: String
+    Description: Secrets Manager ARN of swapify/web/cognito-client-secret.
 
 Resources:
   # --- Networking -----------------------------------------------------------
-  ApiSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Swapify API service
-      VpcId: !Ref VpcId
-  WebSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Swapify web service
-      VpcId: !Ref VpcId
-  LoadBalancerSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Swapify load balancer
-      VpcId: !Ref VpcId
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 443
-          ToPort: 443
-          CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: 80
-          ToPort: 80
-          CidrIp: 0.0.0.0/0
-      SecurityGroupEgress:
-        - IpProtocol: -1
-          CidrIp: 0.0.0.0/0
-  ApiIngressFromAlb:
-    Type: AWS::EC2::SecurityGroupIngress
-    Properties:
-      GroupId: !Ref ApiSecurityGroup
-      IpProtocol: tcp
-      FromPort: 4000
-      ToPort: 4000
-      SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
-  WebIngressFromAlb:
-    Type: AWS::EC2::SecurityGroupIngress
-    Properties:
-      GroupId: !Ref WebSecurityGroup
-      IpProtocol: tcp
-      FromPort: 3000
-      ToPort: 3000
-      SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
+  # VPC, subnets, NAT routing and all security groups are owned by
+  # infra/cloudformation/networking.yml and consumed via parameters.
 
   # --- IAM ------------------------------------------------------------------
   ExecutionRole:
@@ -215,8 +188,8 @@ Resources:
       NetworkMode: awsvpc
       Cpu: !Ref ApiCpu
       Memory: !Ref ApiMemory
-      ExecutionRoleArn: !Ref ExecutionRole
-      TaskRoleArn: !Ref ApiTaskRole
+      ExecutionRoleArn: !GetAtt ExecutionRole.Arn
+      TaskRoleArn: !GetAtt ApiTaskRole.Arn
       ContainerDefinitions:
         - Name: api
           Image: !Ref ApiImage
@@ -280,8 +253,8 @@ Resources:
       NetworkMode: awsvpc
       Cpu: !Ref WebCpu
       Memory: !Ref WebMemory
-      ExecutionRoleArn: !Ref ExecutionRole
-      TaskRoleArn: !Ref WebTaskRole
+      ExecutionRoleArn: !GetAtt ExecutionRole.Arn
+      TaskRoleArn: !GetAtt WebTaskRole.Arn
       ContainerDefinitions:
         - Name: web
           Image: !Ref WebImage
@@ -332,7 +305,7 @@ Resources:
       NetworkConfiguration:
         AwsvpcConfiguration:
           AssignPublicIp: DISABLED
-          SecurityGroups: [!Ref ApiSecurityGroup]
+          SecurityGroups: [!Ref ApiSecurityGroupId]
           Subnets: !Ref ApiSubnets
       LoadBalancers:
         - ContainerName: api
@@ -352,7 +325,7 @@ Resources:
       NetworkConfiguration:
         AwsvpcConfiguration:
           AssignPublicIp: DISABLED
-          SecurityGroups: [!Ref WebSecurityGroup]
+          SecurityGroups: [!Ref WebSecurityGroupId]
           Subnets: !Ref WebSubnets
       LoadBalancers:
         - ContainerName: web
@@ -366,7 +339,7 @@ Resources:
       Name: !Sub "swapify-alb-${EnvName}"
       Type: application
       Scheme: internet-facing
-      SecurityGroups: [!Ref LoadBalancerSecurityGroup]
+      SecurityGroups: [!Ref LoadBalancerSecurityGroupId]
       Subnets: !Ref LoadBalancerSubnets
 
   ApiTargetGroup:

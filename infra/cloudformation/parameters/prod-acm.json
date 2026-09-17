@@ -1,0 +1,5 @@
+[
+  { "ParameterKey": "EnvName", "ParameterValue": "prod" },
+  { "ParameterKey": "DomainName", "ParameterValue": "swapify.app" },
+  { "ParameterKey": "SubjectAlternativeNames", "ParameterValue": "api.swapify.app" }
+]
