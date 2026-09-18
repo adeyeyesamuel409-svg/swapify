@@ -84,7 +84,7 @@ Resources:
       StorageEncrypted: true
       DBName: !Ref DbName
       MasterUsername: !Ref MasterUsername
-      MasterUserSecret: {}
+      ManageMasterUserPassword: true
       DBSubnetGroupName: !Ref DbSubnetGroup
       VPCSecurityGroups:
         - !Ref RdsSecurityGroupId
