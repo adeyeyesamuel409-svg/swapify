@@ -43,7 +43,7 @@ const connectRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
   // POST /users/me/connect/onboarding — create or resume onboarding.
   app.post('/users/me/connect/onboarding', { preHandler: [app.authenticate] }, async (request) => {
     const userId = request.user!.id;
-    const userEmail = request.user!.email ?? `${userId}@swapify.app`;
+    const userEmail = request.user!.email ?? `${userId}@swapifyuk.com`;
     const returnBaseUrl = process.env.WEB_BASE_URL ?? 'http://localhost:3000';
 
     const { stripeAccountId, status } = await createConnectedAccount(userId, userEmail);

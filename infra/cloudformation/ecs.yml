@@ -30,13 +30,13 @@ Parameters:
     Description: 'ECR image URI for the web app: <account>.dkr.ecr.us-east-1.amazonaws.com/swapify-web:<git-sha> (build with NEXT_PUBLIC_IMAGE_BASE_URL set to the CDN base URL).'
   ApiDomainName:
     Type: String
-    Description: Public host for the API, e.g. api.swapify.app
+    Description: Public host for the API, e.g. api.swapifyuk.com
   WebDomainName:
     Type: String
-    Description: Public host for the web app, e.g. swapify.app
+    Description: Public host for the web app, e.g. swapifyuk.com
   CertificateArn:
     Type: String
-    Description: ACM certificate ARN covering ApiDomainName and WebDomainName.
+    Description: ACM certificate ARN covering ApiDomainName, WebDomainName and the www.swapifyuk.com SAN.
   ApiDesiredCount:
     Type: Number
     Default: 1
@@ -414,6 +414,11 @@ Resources:
           HostHeaderConfig:
             Values: [!Ref ApiDomainName]
 
+  # NOTE: www.swapifyuk.com is covered by the certificate SAN, but there is no
+  # ALB listener rule for it yet. A host-header redirect rule (www.swapifyuk.com
+  # -> https://swapifyuk.com, HTTP 301) must be added in a reviewed
+  # infrastructure change before DNS points www at the ALB; pointing it at the
+  # ALB without a matching rule yields no listener match.
   WebListenerRule:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule
     Properties:

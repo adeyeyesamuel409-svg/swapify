@@ -22,7 +22,7 @@ Parameters:
   CustomDomainName:
     Type: String
     Default: ""
-    Description: Optional CloudFront alternate domain (e.g. images.swapify.app). Requires AcmCertificateArn.
+    Description: Optional CloudFront alternate domain (e.g. images.swapifyuk.com). Requires AcmCertificateArn.
   AcmCertificateArn:
     Type: String
     Default: ""

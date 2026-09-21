@@ -27,7 +27,7 @@ live in `us-east-1` (account 588170396448).
 |---|---|---|---|
 | 1 | `swapify-networking` | `networking.yml` + `parameters/prod-networking.json` | VPC `10.0.0.0/16`, public/app/db subnets, 1 NAT (or 3 with `NatGateways=3`), all security groups |
 | 2 | `swapify-ecr` | `ecr.yml` + `parameters/prod-ecr.json` | `swapify-api`, `swapify-web` (immutable tags, scan on push) |
-| 3 | `swapify-acm` | `acm.yml` + `parameters/prod-acm.json` | `swapify.app` + `api.swapify.app` (DNS validation). Domains are not in this account's Route 53, so the stack will sit in `CREATE_IN_PROGRESS`; run `aws acm describe-certificate --certificate-arn <arn> --region us-east-1` to read the `DomainValidationOptions` CNAMEs and add them at the registrar (see step g) before continuing |
+| 3 | `swapify-acm` | `acm.yml` + `parameters/prod-acm.json` | `swapifyuk.com` + `api.swapifyuk.com` + `www.swapifyuk.com` (DNS validation). The hosted zone is in this account's Route 53 (`Z020662010TRMMMFK80BU`), so the validation CNAMEs can be created there directly; the stack will sit in `CREATE_IN_PROGRESS` until the records are in place. Run `aws acm describe-certificate --certificate-arn <arn> --region us-east-1` to read the `DomainValidationOptions` CNAMEs (see step g) before continuing |
 | 4 | `swapify-rds` | `rds.yml` + `parameters/prod-rds.json` | Fill `VpcId`/`DbSubnetIds`/`RdsSecurityGroupId` from networking stack outputs; PostgreSQL 16, private-only, RDS-managed password secret |
 | 5 | `swapify-storage` | `storage.yml` (**already deployed** — do not recreate) | Outputs: `S3Bucket`, `CdnBaseUrl`, `ApiStorageAccessPolicyArn` |
 | 6 | `swapify-cognito` | `cognito.yml` (**already deployed** — do not recreate) | Outputs: pool, client, domain, issuer |
@@ -59,7 +59,7 @@ The **secret name** is the contract passed as the `*SecretArn` parameters:
    creates Express accounts with `type: 'express'`, `capabilities:
    { transfers: { requested: true } }`).
 3. Register a **webhook endpoint**:
-   - URL: `https://<ApiDomainName>/stripe/webhook`
+   - URL: `https://api.swapifyuk.com/stripe/webhook`
    - Events: `checkout.session.completed`, `account.updated`, `payout.paid`,
      `payout.failed`, `payout.canceled`, `transfer.failed`, `transfer.updated`,
      `charge.dispute.created`
@@ -106,6 +106,10 @@ CI runs `prisma migrate diff --from-migrations --to-schema-datamodel
 3. Store `COGNITO_CLIENT_SECRET` in Secrets Manager as `swapify/web/cognito-client-secret`.
 4. Set `COGNITO_USER_POOL_ID`, `COGNITO_CLIENT_ID`, `COGNITO_REGION` in the
    ECS task environment.
+5. The production app client (via `ProdCallbackUrl` / `ProdLogoutUrl`) must
+   include callback `https://swapifyuk.com/api/auth/callback/cognito` and
+   logout `https://swapifyuk.com` when the Cognito stack is updated. Until
+   then the client accepts localhost URLs only.
 
 ### e. Build and push Docker images
 
@@ -141,7 +145,7 @@ aws cloudformation deploy --stack-name swapify-ecs \
     ApiSubnets=<AppSubnetIds> WebSubnets=<AppSubnetIds> \
     LoadBalancerSecurityGroupId=<…> ApiSecurityGroupId=<…> WebSecurityGroupId=<…> \
     ApiImage="$ECR_API:$SHA" WebImage="$ECR_WEB:$SHA" \
-    ApiDomainName=api.swapify.app WebDomainName=swapify.app \
+    ApiDomainName=api.swapifyuk.com WebDomainName=swapifyuk.com \
     CertificateArn=<from swapify-acm> \
     CognitoUserPoolId=<…> CognitoClientId=<…> CognitoIssuer=<…> \
     S3Bucket=<from swapify-storage> CdnBaseUrl=<…> StorageAccessPolicyArn=<…> \
@@ -158,13 +162,21 @@ ECS performs a rolling update; the ALB health check gates traffic:
 ### g. Configure DNS
 
 Point `ApiDomainName` and `WebDomainName` at the ALB DNS name (Route 53 /
-CNAME). The ALB HTTPS listener uses the ACM certificate; HTTP redirects to
-HTTPS (301). Because the domains are not hosted in this account's Route 53,
-complete certificate validation first: read the CNAMEs from
+A/alias records). The ALB HTTPS listener uses the ACM certificate; HTTP
+redirects to HTTPS (301). The domains are hosted **in this account's Route 53**
+(hosted zone `swapifyuk.com.` = `Z020662010TRMMMFK80BU`). Complete certificate
+validation first: read the CNAMEs from
 `aws acm describe-certificate --certificate-arn <arn>` (the `swapify-acm` stack
-stays in `CREATE_IN_PROGRESS` until validation), create them at the registrar,
-wait for the certificate to reach `ISSUED`, then point `swapify.app` and
-`api.swapify.app` → `LoadBalancerDnsName`.
+stays in `CREATE_IN_PROGRESS` until validation), create them in the hosted
+zone, wait for the certificate to reach `ISSUED`, then point `swapifyuk.com`
+and `api.swapifyuk.com` → ALB `LoadBalancerDnsName`.
+
+**www hostname:** `www.swapifyuk.com` is included in the certificate SAN, but
+the ALB has **no listener rule for www yet** — pointing `www.swapifyuk.com` at
+the ALB without a matching rule yields no listener match. A host-header
+redirect rule (`www.swapifyuk.com` → `https://swapifyuk.com`, HTTP 301) must be
+added to the ECS template in a reviewed infrastructure change; do not create
+the `www.swapifyuk.com` DNS record until that rule is deployed.
 
 ### h. Verify health
 
@@ -227,7 +239,7 @@ never enabled in production.
 
 Register a webhook in the Stripe Dashboard (or via `cli listen` for test):
 
-- **Endpoint URL:** `https://<ApiDomainName>/stripe/webhook`
+- **Endpoint URL:** `https://api.swapifyuk.com/stripe/webhook`
 - **Signing secret:** paste the `whsec_...` into `swapify/stripe/webhook-secret`.
 - **Events to subscribe** (the handler in `apps/api/src/routes/stripe.ts`
   processes these; any others are logged as unhandled and are safe no-ops):

@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "Swapify - ACM certificates for swapify.app and api.swapify.app (DNS validation, us-east-1)"
+Description: "Swapify - ACM certificates for swapifyuk.com, api.swapifyuk.com and www.swapifyuk.com (DNS validation, us-east-1)"
 
 Parameters:
   EnvName:
@@ -8,11 +8,11 @@ Parameters:
     Description: Environment name used in resource tags.
   DomainName:
     Type: String
-    Default: swapify.app
+    Default: swapifyuk.com
     Description: Primary domain the certificate covers.
   SubjectAlternativeNames:
     Type: List<String>
-    Default: "api.swapify.app"
+    Default: "api.swapifyuk.com,www.swapifyuk.com"
     Description: Additional domains covered by the certificate.
 
 Resources:
