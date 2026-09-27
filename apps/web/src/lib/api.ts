@@ -1,4 +1,9 @@
-const API_URL = process.env.API_URL ?? "http://localhost:4000";
+// Browser bundles only receive NEXT_PUBLIC_* values (inlined at build time), so
+// client-side requests prefer NEXT_PUBLIC_API_URL. Server components/RSC use the
+// runtime API_URL (set in the ECS task); both point at the production API. Local
+// development falls back to localhost.
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ?? process.env.API_URL ?? "http://localhost:4000";
 
 // Public base used to resolve relative image keys (uploads/<uuid>.<ext>).
 // Local development falls back to the API (which serves the files). In

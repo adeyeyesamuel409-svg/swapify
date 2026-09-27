@@ -106,10 +106,11 @@ CI runs `prisma migrate diff --from-migrations --to-schema-datamodel
 3. Store `COGNITO_CLIENT_SECRET` in Secrets Manager as `swapify/web/cognito-client-secret`.
 4. Set `COGNITO_USER_POOL_ID`, `COGNITO_CLIENT_ID`, `COGNITO_REGION` in the
    ECS task environment.
-5. The production app client (via `ProdCallbackUrl` / `ProdLogoutUrl`) must
-   include callback `https://swapifyuk.com/api/auth/callback/cognito` and
-   logout `https://swapifyuk.com` when the Cognito stack is updated. Until
-   then the client accepts localhost URLs only.
+5. Production callback and logout URLs are **already configured** on the app
+   client (updated via `cognito.yml` in a prior phase): callback
+   `https://swapifyuk.com/api/auth/callback/cognito` and logout
+   `https://swapifyuk.com`, while the localhost callback/logout URLs remain
+   preserved for development.
 
 ### e. Build and push Docker images
 
@@ -126,12 +127,25 @@ ECR_WEB=<account>.dkr.ecr.us-east-1.amazonaws.com/swapify-web
 docker build -f apps/api/Dockerfile -t "$ECR_API:$SHA" .
 docker push "$ECR_API:$SHA"
 
-# Web (requires NEXT_PUBLIC_IMAGE_BASE_URL set at build time if using CDN)
+# Web (client bundles inline NEXT_PUBLIC_* values at build time, so they must be
+# passed as build args; API_URL is passed at build and also set at runtime by ECS)
 docker build -f apps/web/Dockerfile \
   --build-arg NEXT_PUBLIC_IMAGE_BASE_URL=https://<cloudfront>.cloudfront.net \
+  --build-arg NEXT_PUBLIC_API_URL=https://api.swapifyuk.com \
+  --build-arg API_URL=https://api.swapifyuk.com \
   -t "$ECR_WEB:$SHA" .
 docker push "$ECR_WEB:$SHA"
 ```
+
+**Web environment split at build time:**
+- **Build-time public (`NEXT_PUBLIC_*`)** — inlined into browser bundles, never secrets:
+  `NEXT_PUBLIC_IMAGE_BASE_URL`, `NEXT_PUBLIC_API_URL`.
+- **Runtime environment** — injected by the ECS task definition: `NEXTAUTH_URL`,
+  `COGNITO_CLIENT_ID`, `COGNITO_ISSUER`, `API_URL`.
+- **Secrets (runtime, injected from AWS Secrets Manager, never build args):**
+  `NEXTAUTH_SECRET`, `COGNITO_CLIENT_SECRET`.
+API runtime secrets (`DATABASE_URL`, `STRIPE_SECRET_KEY`,
+`STRIPE_WEBHOOK_SECRET`) are likewise never baked into images.
 
 ### f. Deploy ECS stack
 
@@ -171,12 +185,19 @@ stays in `CREATE_IN_PROGRESS` until validation), create them in the hosted
 zone, wait for the certificate to reach `ISSUED`, then point `swapifyuk.com`
 and `api.swapifyuk.com` → ALB `LoadBalancerDnsName`.
 
-**www hostname:** `www.swapifyuk.com` is included in the certificate SAN, but
-the ALB has **no listener rule for www yet** — pointing `www.swapifyuk.com` at
-the ALB without a matching rule yields no listener match. A host-header
-redirect rule (`www.swapifyuk.com` → `https://swapifyuk.com`, HTTP 301) must be
-added to the ECS template in a reviewed infrastructure change; do not create
-the `www.swapifyuk.com` DNS record until that rule is deployed.
+**www hostname:** the canonical web hostname is **`https://swapifyuk.com`**
+(apex). `www.swapifyuk.com` is included in the certificate SAN and is
+redirected to the apex by a dedicated ALB listener rule (`www.swapifyuk.com` →
+`https://swapifyuk.com`, HTTP 301, preserving path and query) defined in
+`infra/cloudformation/ecs.yml` (`WwwRedirectRule`, priority 30). The rule is
+**implemented in the template but its actual AWS effect applies only once the
+ECS/ALB stack is deployed** — do not treat the redirect as live until then.
+Important: without that dedicated rule, `www.swapifyuk.com` would fall through
+to the HTTPS listener's default action and be served by the web target group
+under the www hostname rather than erroring. Do not create the
+`www.swapifyuk.com` DNS record until the ECS/ALB stack (including the redirect
+rule) is deployed. The `swapifyuk.com` / `api.swapifyuk.com` records above
+remain dependent on the ALB endpoint existing.
 
 ### h. Verify health
 
