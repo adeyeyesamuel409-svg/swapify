@@ -269,6 +269,12 @@ Resources:
           Environment:
             - Name: NODE_ENV
               Value: production
+            # Next.js standalone binds its HTTP server to process.env.HOSTNAME.
+            # ECS injects HOSTNAME as the task's private hostname (not loopback),
+            # which breaks the container health check hitting localhost. Pin it
+            # to 0.0.0.0 so the server listens on all interfaces.
+            - Name: HOSTNAME
+              Value: 0.0.0.0
             - Name: NEXTAUTH_URL
               Value: !Sub "https://${WebDomainName}"
             - Name: COGNITO_CLIENT_ID
