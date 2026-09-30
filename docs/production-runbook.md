@@ -61,8 +61,7 @@ The **secret name** is the contract passed as the `*SecretArn` parameters:
 3. Register a **webhook endpoint**:
    - URL: `https://api.swapifyuk.com/stripe/webhook`
    - Events: `checkout.session.completed`, `account.updated`, `payout.paid`,
-     `payout.failed`, `payout.canceled`, `transfer.failed`, `transfer.updated`,
-     `charge.dispute.created`
+     `payout.failed`, `payout.canceled`, `transfer.failed`, `transfer.updated`
    - Copy the **signing secret** (`whsec_...`) into Secrets Manager as
      `swapify/stripe/webhook-secret`.
 4. Enable Stripe Connect payouts for the account.
@@ -98,6 +97,11 @@ CI runs `prisma migrate diff --from-migrations --to-schema-datamodel
 | `20260820051328` | BalanceEntry admin audit fields |
 | `20260820120000` | CHECK constraint: `amountPence > 0` |
 | `20260823133239` | Connect, Withdrawal, PayoutMethod, PayoutWebhookObservation |
+
+**This release (R3.35) adds no database migration.** The reconciliation worker
+uses the existing schema exactly as the API does. Production must be at the 13
+migrations listed above; `prisma migrate status` must be clean before the stack
+is updated, and no `prisma migrate deploy` is part of this release.
 
 ### d. Configure Cognito (one-time)
 
@@ -236,8 +240,7 @@ remain dependent on the ALB endpoint existing.
 - Watch for `ANOMALY:` lines in CloudWatch (missing/duplicate balance credits,
   wrong recipient, RELEASED gap without transfer).
 - Watch for `BALANCE_RECONCILIATION_MISMATCH`.
-- Monitor Stripe Dashboard: platform balance, unsettled transfers/payouts,
-  charge disputes.
+- Monitor Stripe Dashboard: platform balance, unsettled transfers/payouts.
 - Run `reconcileUserBalance` via the admin endpoint periodically.
 
 ### l. Rollback procedure
@@ -271,13 +274,16 @@ Register a webhook in the Stripe Dashboard (or via `cli listen` for test):
   - `payout.canceled`
   - `transfer.failed`
   - `transfer.updated`
-  - `charge.dispute.created`
 
 ### 2.2 Checkout payment
 
 `createSwapPaymentCheckout` creates a Stripe **Checkout Session** (mode
 `payment`, GBP) covering `amountPence` (value gap) + `feePence` (5% service
 fee). The webhook marks the Payment `PAID` and advances the swap AGREED → PAID.
+
+Charge amounts come exclusively from the server-side Payment row (GBP pence).
+Navigating to the success URL never marks a Payment PAID — payment confirmation
+is exclusively webhook-driven.
 
 ### 2.3 Connect Express onboarding
 
@@ -300,7 +306,9 @@ complete KYC themselves in Stripe's hosted browser flow.
 3. `createPayout` creates a **payout** on the connected account
    (`withdrawal:{...}` idempotency key). Status → `PROCESSING`.
 4. Stripe webhook (`payout.paid/failed/canceled`) moves it to `COMPLETED` or
-   reverses the debit on `FAILED`/`CANCELED`.
+   reverses the debit on `FAILED`/`CANCELED`. A missed payout webhook is
+   recovered by operations, not automatically: confirm the payout status in the
+   Stripe Dashboard and act deliberately.
 5. On any failure the debit is atomically reversed (`WITHDRAWAL_REVERSAL`) and a
    `WITHDRAWAL_REVERSAL` balance entry is written, so no funds are lost or
    double-spent.
@@ -323,14 +331,29 @@ Safety invariants enforced in code:
 
 ## 4. Background jobs (sweepers)
 
-The API runs in-process sweepers (`services/sweeper.ts`,
-`services/shipping-sweeper.ts`) plus `reconcileWithdrawals` and
-`reconcileValueGaps`:
+Financial reconciliation runs as a **one-shot task on a schedule**, not inside
+the API:
+
+| Component | Runs | Cadence |
+| --- | --- | --- |
+| `ReconcilerSchedule` (EventBridge Scheduler) → `swapify-reconciler-{env}` | one reconciliation cycle, then exit | `rate(5 minutes)` (`ReconcilerScheduleExpression`) |
+| API task (`swapify-api-{env}`) | HTTP only — `RECONCILE_IN_PROCESS=false` | n/a |
+| API task | shipping poller (`services/shipping-sweeper.ts`, 60s) | per task, still in-process |
+
+The scheduled task runs `node apps/api/dist/reconcile-once.js` in the same
+image as the API. It serves no HTTP, binds no port, has no health check and is
+not attached to the target group, so it is not a second API.
+
+`expireExpiredSwaps()` in `services/sweeper.ts` is the single-cycle entry point
+used by both the worker and the (optional) in-process loop, so there is one copy
+of every rule:
 
 - **Swap expiry** — expires/refunds swaps that never completed.
+- **Refund reconciliation** — refunds recorded gap payments for terminal swaps.
 - **Shipping deadlines** — cancels shipments that didn't pay for postage /
-  dispatch in time.
-- **In-transit polling** — checks carrier tracking; completes swaps on delivery.
+  dispatch in time (API in-process poller).
+- **In-transit polling** — checks carrier tracking; completes swaps on delivery
+  (API in-process poller).
 - **Withdrawal reconciliation** (`reconcileWithdrawals`) — crash recovery for
   withdrawals stuck without a payout ref, and consumes out-of-order payout
   webhooks.
@@ -338,11 +361,65 @@ The API runs in-process sweepers (`services/sweeper.ts`,
   gaps based on authoritative swap/shipment state, and detects anomalies
   (missing/incorrect/duplicate balance credits).
 
-All transitions are **idempotent and concurrency-safe** (atomic conditional
-`updateMany` claims + Stripe idempotency keys), so it is safe for multiple API
-instances to run them. It is redundant but harmless; the code carries a TODO to
-move sweepers to a single ECS **scheduled task / EventBridge** in production to
-avoid N× redundant work.
+These are the baseline rules, unchanged. R3.35 moves *when* they run; it does not
+add, remove or alter any of them.
+
+### 4.1 Delivery semantics: at-least-once
+
+The schedule fires on an exact interval (`FlexibleTimeWindow.Mode: "OFF"`) and
+starts **one** task per interval. This is at-least-once, not exactly-once: a
+task can still overlap a slow previous run, can be killed mid-cycle, and is
+retried up to twice on failure. All transitions are idempotent conditional
+updates (`updateMany` with the eligibility predicate in the `WHERE` clause,
+plus Stripe idempotency keys), so a duplicate or partial run is safe. No lock is
+used, and none is needed — the schedule is not treated as a mutual-exclusion
+mechanism.
+
+### 4.2 Fail-closed behaviour
+
+The worker refuses to run rather than reconcile in a degraded state, and exits
+nonzero so the failure is visible in ECS and CloudWatch:
+
+- Missing `DATABASE_URL` or `STRIPE_SECRET_KEY` → fatal before any query.
+- Placeholder (non-Stripe) Connect disbursement provider still active → fatal.
+  This matters: `reconcileValueGaps()` marks a value gap RELEASED and credits the
+  balance *before* notifying the provider, so running without Stripe would
+  record a release that no Stripe transfer ever backed.
+- Per-item errors (one bad withdrawal, one unreachable carrier) are caught and
+  logged, and the cycle continues — one bad item never aborts the batch.
+
+### 4.3 Deployment order (important)
+
+`ApiRunsReconciliation` controls the API-side flag. Deploy in two steps so
+reconciliation is never unowned:
+
+1. Deploy the stack with `ApiRunsReconciliation=true`. This creates the
+   reconciler task definition and the schedule while the API keeps sweeping as
+   before — duplicate work for a few minutes, which is safe.
+2. Confirm the schedule is firing and the worker is succeeding (see 5.1).
+3. Update the stack with `ApiRunsReconciliation=false`. The API logs
+   `In-process reconciliation disabled` at startup and now serves HTTP only.
+
+Never set `ApiRunsReconciliation=false` before step 1: with no working schedule,
+all reconciliation stops and nothing retries until someone notices.
+
+### 4.4 Manual overrides
+
+`POST /admin/value-gaps/reconcile` (moderator) still calls
+`reconcileValueGaps()` directly. It is an operator escape hatch, not a runner:
+it executes once per request and is safe to use while the schedule is running,
+because the same conditional updates apply. Keep it for incidents.
+
+### 4.5 Running a cycle by hand
+
+```bash
+# One cycle, using the same env the task receives. Exits 0 on success.
+cd apps/api && npm run reconcile:once
+```
+
+For a dry check against production data, run it from a trusted host with the
+same secrets the task uses; it makes real Stripe reads and writes exactly like
+the scheduled task.
 
 ---
 
@@ -358,6 +435,7 @@ avoid N× redundant work.
 
 - API: CloudWatch `/ecs/swapify/{env}/api`
 - Web: CloudWatch `/ecs/swapify/{env}/web`
+- Reconciler: CloudWatch `/ecs/swapify/{env}/reconciler`
 - Structured JSON (pino). Watch for:
   - `ANOMALY:` lines from value-gap/balance reconciliation (missing or
     duplicate balance credits, wrong recipient, RELEASED gap without a
@@ -365,9 +443,26 @@ avoid N× redundant work.
   - `BALANCE_RECONCILIATION_MISMATCH` errors.
   - `Transfer failed`, `Payout failed`, `refund ... aborting refund for
     safety`, `Unhandled Stripe webhook event`.
+  - `FATAL: one-shot reconciliation failed` in the reconciler log group — the
+    task exited nonzero and the schedule retried it.
+  - `In-process reconciliation disabled` in the API log group — expected in
+    production; its **absence** while `ApiRunsReconciliation=false` means the
+    stack is out of sync with the parameter.
 
 ### 5.3 Financial reconciliation
 
+- **Confirm the schedule is alive.** A stopped schedule is silent: no work is
+  queued, nothing errors, and financial state simply ages. Check every few hours
+  (or alert on it) that the reconciler log group has a new
+  `Reconciliation cycle complete` line within ~2 intervals:
+
+  ```bash
+  aws logs tail "/ecs/swapify/prod/reconciler" --since 15m \
+    --filter-pattern "Reconciliation cycle complete"
+  ```
+
+  Also alert on `ReconciliationSchedule-TargetExecutionFailed` for the
+  `swapify-reconciler-{env}` schedule.
 - Periodically run `reconcileUserBalance` (via the admin endpoint) and check
   the discrepancy is 0.
 - Monitor the Stripe Dashboard: platform balance vs the sum of internal
@@ -382,6 +477,14 @@ avoid N× redundant work.
 `reconcileWithdrawals` retries with the same idempotency key. If it stays stuck,
 investigate the connected-account balance (the most common cause is
 `balance_insufficient`). Once funds are available it completes automatically.
+
+### 6.1b Withdrawal stuck in `PROCESSING` with a payout ID (missed webhook)
+
+Reconciliation does not guess at a missed payout webhook. Confirm the payout's
+authoritative status in the Stripe Dashboard; if it is terminal, drive the
+withdrawal through the same path the webhook would have used (never by editing
+the row directly), or apply the reversal in 6.2 deliberately. Treat it as a
+financial incident.
 
 ### 6.2 Stripe payout failed
 
@@ -399,12 +502,37 @@ refund. Do not bypass the guard programmatically.
 
 ### 6.4 Charge dispute
 
-`charge.dispute.created` flags the payment (`refundedAt` set). Review the
-dispute in the Stripe Dashboard. Responses and `funds_withdrawn` / `closed`
-outcomes must be handled manually in the operations process until webhook
-handlers are extended (see audit report).
+Charge-dispute handling is **not part of this release** (it ships in a later
+phase, with its own migrations). Until then `charge.dispute.*` is not
+subscribed and not handled: Stripe logs it as an unhandled event. Handle a
+dispute manually and treat it as a financial incident — confirm the charge
+dispute state and any transfer to the recipient in the Stripe Dashboard before
+moving money. Never infer a refund or release from a dispute.
 
-### 6.5 Rollback
+### 6.5 Reconciliation stopped (no recent cycles in the reconciler log group)
+
+The scheduled reconciler is a one-shot task, so a broken schedule produces no
+error anywhere — state simply ages. Symptoms: expired swaps not expiring,
+withdrawals stuck in `PROCESSING`, HELD value gaps not released.
+
+1. Check the schedule exists and is enabled: `aws scheduler get-schedule --name
+   swapify-reconciler-prod`.
+2. Check the task is starting at all: `aws logs tail
+   "/ecs/swapify/prod/reconciler" --since 1h`.
+3. `FATAL: one-shot reconciliation failed` → read the error. A
+   `placeholder disbursement provider` FATAL means the task is missing
+   `STRIPE_SECRET_KEY` (or its task role lost secret access); do **not** work
+   around it, fix the secret.
+4. No logs at all → the schedule is not firing or the task definition is
+   invalid. Confirm the task definition registered
+   (`aws ecs describe-task-definition --task-definition swapify-reconciler-prod`).
+5. **Fastest safe mitigation:** redeploy the API stack with
+   `ApiRunsReconciliation=true` so the in-process loop resumes reconciliation
+   while the schedule is fixed. Duplicate work during the overlap is safe (every
+   transition is an idempotent conditional update). Do not leave it that way —
+   the duplicate execution is what this split exists to remove.
+
+### 6.6 Rollback
 
 - **Code:** deploy the previous ECR image. Because payments/withdrawals are
   idempotent and reconciled, rolling back mid-flow is safe — pending states are

@@ -40,6 +40,24 @@ Parameters:
   ApiDesiredCount:
     Type: Number
     Default: 1
+  ApiRunsReconciliation:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: >-
+      Whether each API task also runs the in-process reconciliation sweeper.
+      Set false so the scheduled ReconcilerTaskDefinition is the single owner of
+      financial reconciliation (swap expiry, refunds, value gaps, withdrawals).
+      Deploy order: create the stack with true first, confirm the reconciler
+      schedule is firing, then update this parameter to false. Setting it to
+      false with no working schedule stops all reconciliation.
+  ReconcilerScheduleExpression:
+    Type: String
+    Default: "rate(5 minutes)"
+    AllowedPattern: "^(rate|cron)\\(.+\\)$"
+    Description: >-
+      EventBridge Scheduler expression for the one-shot reconciliation task.
+      rate(5 minutes) matches the previous in-process sweeper cadence.
   WebDesiredCount:
     Type: Number
     Default: 1
@@ -148,6 +166,66 @@ Resources:
                   - !Ref StripeSecretKeySecretArn
                   - !Ref StripeWebhookSecretSecretArn
 
+  # Reconciliation worker task role. Least privilege: the one-shot reconciler
+  # needs the database URL and the Stripe key, and nothing else. It deliberately
+  # does NOT inherit ApiTaskRole's storage policy (the reconciler never touches
+  # S3/CloudFront) or the webhook secret (webhook verification stays in the API).
+  ReconcilerTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ReadReconcilerSecrets
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource:
+                  - !Ref DatabaseUrlSecretArn
+                  - !Ref StripeSecretKeySecretArn
+
+  # EventBridge Scheduler needs permission to start the reconciler task and to
+  # pass the task/execution roles to ECS. Scoped to this one task definition, so
+  # the schedule cannot start anything else in the cluster.
+  ReconcilerScheduleRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: RunReconcilerTask
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ecs:RunTask
+                  - ecs:StopTask
+                Resource: !Ref ReconcilerTaskDefinition
+                Condition:
+                  ArnEquals:
+                    ecs:cluster: !GetAtt Cluster.Arn
+              - Effect: Allow
+                Action: iam:PassRole
+                Resource:
+                  - !GetAtt ExecutionRole.Arn
+                  - !GetAtt ReconcilerTaskRole.Arn
+                Condition:
+                  StringEquals:
+                    iam:PassedToService: ecs-tasks.amazonaws.com
+
   WebTaskRole:
     Type: AWS::IAM::Role
     Properties:
@@ -204,6 +282,12 @@ Resources:
           Environment:
             - Name: NODE_ENV
               Value: production
+            - Name: APP_ROLE
+              Value: api
+            # Explicit reconciliation ownership: when false, this task serves
+            # HTTP only and the scheduled reconciler owns the sweep cycle.
+            - Name: RECONCILE_IN_PROCESS
+              Value: !Ref ApiRunsReconciliation
             - Name: PORT
               Value: "4000"
             - Name: HOST
@@ -269,6 +353,12 @@ Resources:
           Environment:
             - Name: NODE_ENV
               Value: production
+            # Next.js standalone binds its HTTP server to process.env.HOSTNAME.
+            # ECS injects HOSTNAME as the task's private hostname (not loopback),
+            # which breaks the container health check hitting localhost. Pin it
+            # to 0.0.0.0 so the server listens on all interfaces.
+            - Name: HOSTNAME
+              Value: 0.0.0.0
             - Name: NEXTAUTH_URL
               Value: !Sub "https://${WebDomainName}"
             - Name: COGNITO_CLIENT_ID
@@ -312,6 +402,56 @@ Resources:
           ContainerPort: 4000
           TargetGroupArn: !Ref ApiTargetGroup
 
+  # One-shot reconciliation task. Started by EventBridge Scheduler, runs a
+  # single reconciliation cycle, exits. Not registered with the load balancer,
+  # binds no port and has no health check, so it is not a second API.
+  #
+  # It runs in the API subnets/security group on purpose: networking.yml allows
+  # RDS ingress (5432) only from ApiSecurityGroupId, and the app subnets reach
+  # Stripe through the NAT gateway. No new security-group rules are required.
+  # A one-shot task here is not reachable from the ALB — only tasks attached to
+  # the target group receive ALB traffic.
+  ReconcilerTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "swapify-reconciler-${EnvName}"
+      RequiresCompatibilities: [FARGATE]
+      NetworkMode: awsvpc
+      Cpu: !Ref ApiCpu
+      Memory: !Ref ApiMemory
+      ExecutionRoleArn: !GetAtt ExecutionRole.Arn
+      TaskRoleArn: !GetAtt ReconcilerTaskRole.Arn
+      ContainerDefinitions:
+        - Name: reconciler
+          Image: !Ref ApiImage
+          Essential: true
+          Cpu: 0
+          # Override the image CMD with the one-shot entry point. Same image as
+          # the API, so the worker can never drift from the API's code.
+          Command: ["node", "apps/api/dist/reconcile-once.js"]
+          Environment:
+            - Name: NODE_ENV
+              Value: production
+            - Name: APP_ROLE
+              Value: worker
+            - Name: LOG_LEVEL
+              Value: info
+            - Name: AWS_REGION
+              Value: !Ref CognitoRegion
+          # No PortMappings and no HealthCheck: the worker serves no HTTP, and a
+          # health check against :4000 would fail forever.
+          Secrets:
+            - Name: DATABASE_URL
+              ValueFrom: !Ref DatabaseUrlSecretArn
+            - Name: STRIPE_SECRET_KEY
+              ValueFrom: !Ref StripeSecretKeySecretArn
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref ReconcilerLogGroup
+              awslogs-region: !Ref "AWS::Region"
+              awslogs-stream-prefix: reconciler
+
   WebService:
     Type: AWS::ECS::Service
     DependsOn: WebListenerRule
@@ -331,6 +471,44 @@ Resources:
         - ContainerName: web
           ContainerPort: 3000
           TargetGroupArn: !Ref WebTargetGroup
+
+  # --- Reconciliation schedule ------------------------------------------------
+  #
+  # One task per interval, started by EventBridge Scheduler (managed schedule,
+  # no rule/permission juggling, built-in retry). At-least-once delivery: the
+  # schedule may overlap a previous run that is still starting, and an ECS task
+  # can be killed mid-cycle. Every reconciliation transition is an idempotent
+  # conditional update, so a duplicate or partial run is safe — this schedule
+  # never makes a run exactly-once, and no lock is used to pretend otherwise.
+  ReconcilerSchedule:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: !Sub "swapify-reconciler-${EnvName}"
+      ScheduleExpression: !Ref ReconcilerScheduleExpression
+      # OFF = fire on the exact interval, even if the previous run overran.
+      # FLEXIBLE would skip an interval instead, which would silently delay
+      # reconciliation; a duplicate run is safe, a missed run is not.
+      # Quoted: unquoted OFF is YAML 1.1 boolean false, not the string "OFF".
+      FlexibleTimeWindow:
+        Mode: "OFF"
+      State: ENABLED
+      Target:
+        Arn: !GetAtt Cluster.Arn
+        RoleArn: !GetAtt ReconcilerScheduleRole.Arn
+        # Retries on top of the schedule itself: a task that fails because ECS
+        # or the network was briefly unavailable gets another attempt.
+        RetryPolicy:
+          MaximumEventAgeInSeconds: 3600
+          MaximumRetryAttempts: 2
+        EcsParameters:
+          TaskDefinitionArn: !Ref ReconcilerTaskDefinition
+          LaunchType: FARGATE
+          PlatformVersion: "LATEST"
+          NetworkConfiguration:
+            AwsvpcConfiguration:
+              AssignPublicIp: DISABLED
+              SecurityGroups: [!Ref ApiSecurityGroupId]
+              Subnets: !Ref ApiSubnets
 
   # --- Load balancer --------------------------------------------------------
   LoadBalancer:
@@ -467,6 +645,11 @@ Resources:
     Properties:
       LogGroupName: !Sub "/ecs/swapify/${EnvName}/web"
       RetentionInDays: 30
+  ReconcilerLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/ecs/swapify/${EnvName}/reconciler"
+      RetentionInDays: 30
 
 Outputs:
   LoadBalancerDnsName:
@@ -475,3 +658,9 @@ Outputs:
     Value: !Ref ApiDomainName
   WebDomain:
     Value: !Ref WebDomainName
+  ReconcilerScheduleArn:
+    Description: EventBridge Scheduler schedule that runs the one-shot reconciler.
+    Value: !Ref ReconcilerSchedule
+  ReconcilerTaskDefinition:
+    Description: Task definition used by the reconciliation schedule.
+    Value: !Ref ReconcilerTaskDefinition

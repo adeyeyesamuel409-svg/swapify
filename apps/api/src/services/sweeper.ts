@@ -9,7 +9,13 @@ const log = pino({ name: 'swap-sweeper', level: process.env.LOG_LEVEL ?? 'info' 
 
 // Agreements/payments that outlived their deadline with no confirmation from
 // either party get cancelled and the paid gap payment (if any) refunded.
-// Runs on an interval for now; becomes a scheduled Lambda in a later sprint.
+//
+// Execution (R3.35): expireExpiredSwaps() below is the single-cycle entry point.
+// In production a one-shot worker (services/reconciler.ts, run by the
+// EventBridge schedule in infra/cloudformation/ecs.yml) calls it once per
+// interval and exits; the API disables this in-process loop with
+// RECONCILE_IN_PROCESS=false. The loop here is retained for local development
+// and single-task deployments where no schedule exists.
 //
 // Concurrency safety: ECS may run several API instances, so this sweep must
 // never process the same swap twice. The swap -> EXPIRED transition is an
@@ -19,10 +25,9 @@ const log = pino({ name: 'swap-sweeper', level: process.env.LOG_LEVEL ?? 'info' 
 // observes the swap already EXPIRED (no match) or a participant confirmed
 // receipt in the meantime (no match) and skips it.
 //
-// TODO: Migrate to EventBridge + ECS scheduled task for production. The current
-// in-process setInterval is safe for idempotent operations but will execute the
-// sweep N times for N instances. Each sweep is bounded and idempotent, so this
-// is safe but wasteful. EventBridge + single task avoids redundant work.
+// Scheduling is at-least-once, not exactly-once: the schedule may overlap a
+// still-starting task, and a task can be killed mid-cycle. Nothing here assumes
+// a single runner — every transition is an idempotent conditional update.
 //
 // Backoff: If consecutive errors occur, exponentially increase the interval
 // (up to a cap) to avoid hot retry loops on persistent failures.
@@ -122,10 +127,9 @@ export async function expireExpiredSwaps(): Promise<number> {
   return expiredCount;
 }
 
-// TODO: Migrate to EventBridge + ECS scheduled task for production. The current
-// in-process setInterval is safe for idempotent operations but will execute the
-// sweep N times for N instances. Each sweep is bounded and idempotent, so this
-// is safe but wasteful. EventBridge + single task avoids redundant work.
+// Reconciliation ownership is decided in config.ts (shouldRunInProcessSweepers).
+// Production sets RECONCILE_IN_PROCESS=false and lets the scheduled one-shot
+// worker own the cycle; this loop stays for local development.
 
 async function reconcileRefunds(): Promise<void> {
   const pending = await prisma.payment.findMany({
@@ -181,6 +185,11 @@ async function sweepCycle(): Promise<void> {
 
 export function startSwapSweeper(): ReturnType<typeof setTimeout> {
   stopped = false;
+  // The first cycle runs immediately, and it is async: at the moment this
+  // returns, scheduleNext() has not run yet, so there is no timer to hand back.
+  // The declared handle is therefore null on the first call. Shutdown does not
+  // depend on it — stopSwapSweeper() sets `stopped`, which stops scheduleNext()
+  // from re-arming the loop even if a cycle is still in flight.
   void sweepCycle();
   return sweepTimer!;
 }

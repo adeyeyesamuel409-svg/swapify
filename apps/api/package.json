@@ -7,6 +7,8 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
+    "reconcile:once": "tsx src/reconcile-once.ts",
+    "start:reconcile": "node dist/reconcile-once.js",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit"
   },

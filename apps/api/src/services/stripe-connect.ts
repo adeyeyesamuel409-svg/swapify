@@ -18,7 +18,7 @@
 import Stripe from 'stripe';
 import { prisma } from '@swapify/db';
 import { getStripe, stripeEnabled } from './stripe.js';
-import { setDisbursementProvider } from './value-gap.js';
+import { getDisbursementProvider, setDisbursementProvider } from './value-gap.js';
 import pino from 'pino';
 
 const log = pino({ name: 'stripe-connect', level: process.env.LOG_LEVEL ?? 'info' });
@@ -655,3 +655,33 @@ export const stripeDisbursementProvider: DisbursementProvider = {
     }
   },
 };
+
+// ---------------------------------------------------------------------------
+// assertRealDisbursementProvider
+//
+// Hard precondition for any process that runs reconciliation.
+//
+// wireStripeConnect() is called by buildApp() for the API, so the API always
+// has the real provider. A process that runs reconcileValueGaps() WITHOUT
+// calling it keeps the placeholder provider, whose release() is a no-op that
+// only logs — while releaseValueGap() has already committed the ValueGap as
+// RELEASED and credited the balance. That combination is silent money loss:
+// the ledger says the value gap was paid out, Stripe never moved the funds.
+//
+// The reconciliation worker calls this after wiring so a misconfigured task
+// exits nonzero instead of reconciling with a fake provider.
+// ---------------------------------------------------------------------------
+export function assertRealDisbursementProvider(): void {
+  if (!stripeEnabled) {
+    throw new Error(
+      'FATAL: STRIPE_SECRET_KEY is not set — the placeholder disbursement provider is active. ' +
+        'Refusing to reconcile: value gaps would be marked RELEASED in the ledger with no real Stripe transfer behind them.',
+    );
+  }
+  if (getDisbursementProvider() !== stripeDisbursementProvider) {
+    throw new Error(
+      'FATAL: the Stripe Connect disbursement provider is not active. ' +
+        'Refusing to reconcile: value gaps would be marked RELEASED in the ledger with no real Stripe transfer behind them.',
+    );
+  }
+}
