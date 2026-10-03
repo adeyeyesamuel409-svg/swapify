@@ -689,7 +689,8 @@ Resources:
       LogGroupName: !Ref ReconcilerLogGroup
       FilterName: ReconcilerRunStarted
       # Matches reconcile-once.ts "One-shot reconciliation worker starting".
-      FilterPattern: '"One-shot reconciliation worker starting"'
+      # Validated against real log events with the Logs TestMetricFilter API.
+      FilterPattern: '{ $.msg = "One-shot reconciliation worker starting" }'
       MetricTransformations:
         - MetricNamespace: !Sub "Swapify/${EnvName}/Reconciliation"
           MetricName: ReconcilerRunStarted
@@ -707,8 +708,9 @@ Resources:
       FilterName: ReconcilerRunFailed
       # "Sweep cycle failed" is the propagating top-level failure in sweeper.ts;
       # the other term is the fatal handler in reconcile-once.ts. Both mean the
-      # run did not succeed.
-      FilterPattern: '{ "FATAL: one-shot reconciliation failed", "Sweep cycle failed" }'
+      # run did not succeed. The trailing wildcard avoids depending on the exact
+      # wording (and non-ASCII dash) after "failed".
+      FilterPattern: '{ $.msg = "FATAL: one-shot reconciliation failed*" || $.msg = "Sweep cycle failed" }'
       MetricTransformations:
         - MetricNamespace: !Sub "Swapify/${EnvName}/Reconciliation"
           MetricName: ReconcilerRunFailed
@@ -723,7 +725,7 @@ Resources:
       # Step-level errors in sweeper.ts that are logged and then swallowed, so
       # the process can still exit 0. "Sweep cycle failed" is deliberately NOT
       # included here: it propagates and is already counted as a run failure.
-      FilterPattern: '{ "Failed to reconcile value gaps", "Failed to reconcile withdrawals", "Failed to reconcile refund", "Failed to expire swap", "Failed to cancel shipments during swap expiry" }'
+      FilterPattern: '{ $.msg = "Failed to reconcile value gaps" || $.msg = "Failed to reconcile withdrawals" || $.msg = "Failed to reconcile refund" || $.msg = "Failed to expire swap" || $.msg = "Failed to cancel shipments during swap expiry" }'
       MetricTransformations:
         - MetricNamespace: !Sub "Swapify/${EnvName}/Reconciliation"
           MetricName: ReconcilerStepError
@@ -865,9 +867,11 @@ Resources:
     Properties:
       LogGroupName: !Ref ReconcilerTaskEventLogGroup
       FilterName: ReconcilerTaskFailed
-      # Substring terms, so a task failure is counted regardless of the exact
-      # exit code or AWS wording appended to the stopped reason.
-      FilterPattern: '{ "Essential container in task exited", "CannotPullContainerError", "CannotStartContainerError", "executeContainerError", "ResourceInitializationError", "InvalidParameterException" }'
+      # Exact equality on the JSON field, so a task failure is counted regardless of
+      # the exit code or AWS wording appended after it. "Essential container in
+      # task exited" is the observed stoppedReason for non-zero exits; the two
+      # wildcard terms cover image-pull and resource-init launch failures.
+      FilterPattern: '{ $.stoppedReason = "Essential container in task exited" || $.stoppedReason = "CannotPullContainerError*" || $.stoppedReason = "ResourceInitializationError*" }'
       MetricTransformations:
         - MetricNamespace: !Sub "Swapify/${EnvName}/Reconciliation"
           MetricName: ReconcilerTaskFailed
