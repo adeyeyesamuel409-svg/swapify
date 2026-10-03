@@ -651,6 +651,247 @@ Resources:
       LogGroupName: !Sub "/ecs/swapify/${EnvName}/reconciler"
       RetentionInDays: 30
 
+  # --- Reconciliation observability (R3.38) ---------------------------------
+  # READ-ONLY / NON-FINANCIAL. Nothing in this block changes reconciliation
+  # behaviour, the schedule expression, the schedule state, the scheduler
+  # target, any ECS task definition, the API or web service, the database,
+  # or any Stripe configuration. It only derives telemetry from the
+  # reconciler's EXISTING log output and from ECS task state events.
+  #
+  # Why these signals:
+  #  * ReconcilerRunStarted emits a datapoint only when a worker actually
+  #    starts, so an empty 5-minute window means no invocation happened at all.
+  #    That one metric covers scheduler disabled, ECS launch failure, secret
+  #    injection failure and config validation failure.
+  #  * ReconcilerRunFailed counts fatal exits and propagating cycle failures.
+  #  * ReconcilerStepError counts step errors that are logged and swallowed,
+  #    so the worker can still exit 0 and no exit-code check can see them.
+  #  * ReconcilerRunDuration extracts the durationMs value the reconciler
+  #    already writes at the JSON root of every cycle, so no application
+  #    logging change is needed to produce it.
+  #
+  # Division of responsibility, to avoid double paging:
+  #  * Silence belongs to the missing-execution alarm, and only to it, so it
+  #    treats missing data as breaching.
+  #  * The error and duration alarms are threshold alarms and explicitly treat
+  #    missing data as not breaching, so a quiet period is never an error.
+  ReconciliationAlertTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      # Deliberately has no subscription: alerts have no operator recipient
+      # until one is confirmed. Nothing is wired to canary-demo.
+      TopicName: !Sub "swapify-reconciliation-alerts-${EnvName}"
+      DisplayName: !Sub "Swapify ${EnvName} reconciliation alerts"
+
+  ReconcilerRunStartedMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref ReconcilerLogGroup
+      FilterName: ReconcilerRunStarted
+      # Matches reconcile-once.ts "One-shot reconciliation worker starting".
+      FilterPattern: '"One-shot reconciliation worker starting"'
+      MetricTransformations:
+        - MetricNamespace: !Sub "Swapify/${EnvName}/Reconciliation"
+          MetricName: ReconcilerRunStarted
+          MetricValue: "1"
+          # Publish 0 during quiet windows so the series stays continuous. The
+          # alarm still breaches at 0 < 1, and TreatMissingData=breaching still
+          # covers the case where even this datapoint is absent.
+          DefaultValue: 0
+          Unit: Count
+
+  ReconcilerRunFailedMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref ReconcilerLogGroup
+      FilterName: ReconcilerRunFailed
+      # "Sweep cycle failed" is the propagating top-level failure in sweeper.ts;
+      # the other term is the fatal handler in reconcile-once.ts. Both mean the
+      # run did not succeed.
+      FilterPattern: '{ "FATAL: one-shot reconciliation failed", "Sweep cycle failed" }'
+      MetricTransformations:
+        - MetricNamespace: !Sub "Swapify/${EnvName}/Reconciliation"
+          MetricName: ReconcilerRunFailed
+          MetricValue: "1"
+          Unit: Count
+
+  ReconcilerStepErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref ReconcilerLogGroup
+      FilterName: ReconcilerStepError
+      # Step-level errors in sweeper.ts that are logged and then swallowed, so
+      # the process can still exit 0. "Sweep cycle failed" is deliberately NOT
+      # included here: it propagates and is already counted as a run failure.
+      FilterPattern: '{ "Failed to reconcile value gaps", "Failed to reconcile withdrawals", "Failed to reconcile refund", "Failed to expire swap", "Failed to cancel shipments during swap expiry" }'
+      MetricTransformations:
+        - MetricNamespace: !Sub "Swapify/${EnvName}/Reconciliation"
+          MetricName: ReconcilerStepError
+          MetricValue: "1"
+          Unit: Count
+
+  ReconcilerRunDurationMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref ReconcilerLogGroup
+      FilterName: ReconcilerRunDuration
+      # reconciler.ts logs { expiredSwaps, durationMs } at the JSON root on
+      # every cycle, so this yields a real numeric millisecond duration.
+      FilterPattern: '{ $.durationMs = * }'
+      MetricTransformations:
+        - MetricNamespace: !Sub "Swapify/${EnvName}/Reconciliation"
+          MetricName: ReconcilerRunDuration
+          MetricValue: "$.durationMs"
+          Unit: Milliseconds
+
+  ReconcilerMissingExecutionAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "swapify-${EnvName}-reconciler-missing-execution"
+      AlarmDescription: "No reconciler run started for two consecutive 5-minute windows (~10-11 minutes). Detects scheduler disabled, ECS launch failure, secret injection failure or config validation failure."
+      Namespace: !Sub "Swapify/${EnvName}/Reconciliation"
+      MetricName: ReconcilerRunStarted
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 2
+      # One run per 5-minute window is the expected value, so anything below
+      # one is a missed window. Two consecutive evaluations are required, so a
+      # single boundary cannot false-alarm on ordinary jitter.
+      Threshold: 1
+      ComparisonOperator: LessThanThreshold
+      TreatMissingData: breaching
+      AlarmActions:
+        - !Ref ReconciliationAlertTopic
+      OKActions:
+        - !Ref ReconciliationAlertTopic
+
+  ReconcilerRunFailedAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "swapify-${EnvName}-reconciler-run-failed"
+      AlarmDescription: "At least one reconciler execution reported a fatal failure or a propagating sweep cycle failure."
+      Namespace: !Sub "Swapify/${EnvName}/Reconciliation"
+      MetricName: ReconcilerRunFailed
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref ReconciliationAlertTopic
+      OKActions:
+        - !Ref ReconciliationAlertTopic
+
+  ReconcilerStepErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "swapify-${EnvName}-reconciler-step-error"
+      AlarmDescription: "Reconciliation step errors were logged. These steps catch and swallow their own errors, so the worker can still exit 0 and an exit-code check would miss them."
+      Namespace: !Sub "Swapify/${EnvName}/Reconciliation"
+      MetricName: ReconcilerStepError
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref ReconciliationAlertTopic
+      OKActions:
+        - !Ref ReconciliationAlertTopic
+
+  ReconcilerRunDurationAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "swapify-${EnvName}-reconciler-run-duration"
+      AlarmDescription: "Average reconciler cycle duration exceeded 30000 ms. The observed healthy range is 124-289 ms, so this threshold sits deliberately far above normal runtime variance; it detects gross slowdown, not latency SLOs."
+      Namespace: !Sub "Swapify/${EnvName}/Reconciliation"
+      MetricName: ReconcilerRunDuration
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 30000
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref ReconciliationAlertTopic
+      OKActions:
+        - !Ref ReconciliationAlertTopic
+
+  ReconcilerTaskEventLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/ecs/swapify/${EnvName}/reconciler-task-events"
+      RetentionInDays: 30
+
+  ReconcilerTaskStateChangeRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub "swapify-${EnvName}-reconciler-task-state-change"
+      Description: "ECS task state changes for the Swapify reconciler task definition only. Provides durable evidence of launch failures, exit codes and stopped reasons, which ECS otherwise retains for only about one hour."
+      EventPattern:
+        source:
+          - aws.ecs
+        detail-type:
+          - ECS Task State Change
+        detail:
+          clusterArn:
+            - !Sub "arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:cluster/swapify-${EnvName}"
+          taskDefinitionArn:
+            - !Sub "arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:task-definition/swapify-reconciler-${EnvName}:*"
+      State: ENABLED
+      Targets:
+        - Id: reconciler-task-events
+          Arn: !GetAtt ReconcilerTaskEventLogGroup.Arn
+          # Logs only. No SNS target here on purpose: every run emits several
+          # task state changes, so notifying on the event itself would page on
+          # healthy operation. Failures are raised by the alarm below instead.
+          InputTransformer:
+            InputPathsMap:
+              detailType: "$.detail-type"
+              cluster: "$.detail.clusterArn"
+              taskDef: "$.detail.taskDefinitionArn"
+              taskArn: "$.detail.taskArn"
+              status: "$.detail.status"
+              stoppedReason: "$.detail.stoppedReason"
+              containers: "$.detail.containers"
+              startedAt: "$.detail.startedAt"
+              stoppedAt: "$.detail.stoppedAt"
+            InputTemplate: '{"detailType":"<detailType>","cluster":"<cluster>","taskDef":"<taskDef>","taskArn":"<taskArn>","status":"<status>","stoppedReason":"<stoppedReason>","containers":"<containers>","startedAt":"<startedAt>","stoppedAt":"<stoppedAt>"}'
+
+  ReconcilerTaskFailedMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref ReconcilerTaskEventLogGroup
+      FilterName: ReconcilerTaskFailed
+      # Substring terms, so a task failure is counted regardless of the exact
+      # exit code or AWS wording appended to the stopped reason.
+      FilterPattern: '{ "Essential container in task exited", "CannotPullContainerError", "CannotStartContainerError", "executeContainerError", "ResourceInitializationError", "InvalidParameterException" }'
+      MetricTransformations:
+        - MetricNamespace: !Sub "Swapify/${EnvName}/Reconciliation"
+          MetricName: ReconcilerTaskFailed
+          MetricValue: "1"
+          Unit: Count
+
+  ReconcilerTaskFailedAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "swapify-${EnvName}-reconciler-task-failed"
+      AlarmDescription: "An ECS task state change for the reconciler reported a non-zero essential-container exit or a launch/placement failure. Catches crashes that never reach the worker's own logging."
+      Namespace: !Sub "Swapify/${EnvName}/Reconciliation"
+      MetricName: ReconcilerTaskFailed
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref ReconciliationAlertTopic
+      OKActions:
+        - !Ref ReconciliationAlertTopic
+
 Outputs:
   LoadBalancerDnsName:
     Value: !GetAtt LoadBalancer.DNSName
@@ -664,3 +905,12 @@ Outputs:
   ReconcilerTaskDefinition:
     Description: Task definition used by the reconciliation schedule.
     Value: !Ref ReconcilerTaskDefinition
+  ReconciliationAlertTopicArn:
+    Description: Dedicated Swapify reconciliation observability alert topic. Has no subscription until an operator endpoint is confirmed.
+    Value: !Ref ReconciliationAlertTopic
+  ReconcilerObservabilityLogGroups:
+    Description: "R3.38 observability log groups, name:retentionMs"
+    Value: !Sub "/ecs/swapify/${EnvName}/reconciler:300d, /ecs/swapify/${EnvName}/reconciler-task-events:300d"
+  ReconcilerObservabilityMetrics:
+    Description: "R3.38 metric filters, name:logGroup"
+    Value: !Sub "ReconcilerRunStarted,ReconcilerRunFailed,ReconcilerStepError,ReconcilerRunDuration:/ecs/swapify/${EnvName}/reconciler; ReconcilerTaskFailed:/ecs/swapify/${EnvName}/reconciler-task-events"
