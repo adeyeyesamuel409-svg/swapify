@@ -156,21 +156,42 @@ API runtime secrets (`DATABASE_URL`, `STRIPE_SECRET_KEY`,
 ```bash
 aws cloudformation deploy --stack-name swapify-ecs \
   --template-file infra/cloudformation/ecs.yml \
+  --s3-bucket swapify-cfn-templates-588170396448-us-east-1 \
+  --s3-prefix swapify-ecs \
   --capabilities CAPABILITY_NAMED_IAM \
   --parameter-overrides \
     VpcId=<from swapify-networking> \
     LoadBalancerSubnets=<PublicSubnetIds> \
     ApiSubnets=<AppSubnetIds> WebSubnets=<AppSubnetIds> \
-    LoadBalancerSecurityGroupId=<…> ApiSecurityGroupId=<…> WebSecurityGroupId=<…> \
+    LoadBalancerSecurityGroupId=<���> ApiSecurityGroupId=<���> WebSecurityGroupId=<���> \
     ApiImage="$ECR_API:$SHA" WebImage="$ECR_WEB:$SHA" \
     ApiDomainName=api.swapifyuk.com WebDomainName=swapifyuk.com \
     CertificateArn=<from swapify-acm> \
-    CognitoUserPoolId=<…> CognitoClientId=<…> CognitoIssuer=<…> \
-    S3Bucket=<from swapify-storage> CdnBaseUrl=<…> StorageAccessPolicyArn=<…> \
+    CognitoUserPoolId=<���> CognitoClientId=<���> CognitoIssuer=<���> \
+    S3Bucket=<from swapify-storage> CdnBaseUrl=<���> StorageAccessPolicyArn=<���> \
     DatabaseUrlSecretArn=<swapify/database-url ARN> \
-    StripeSecretKeySecretArn=<…> StripeWebhookSecretSecretArn=<…> \
-    NextAuthSecretSecretArn=<…> CognitoClientSecretSecretArn=<…>
+    RdsMasterSecretArn=<rds!db-* ARN of the RDS-managed master secret> \
+    StripeSecretKeySecretArn=<���> StripeWebhookSecretSecretArn=<���> \
+    NextAuthSecretSecretArn=<���> CognitoClientSecretSecretArn=<���>
 ```
+
+`--s3-bucket` is required, not optional. CloudFormation caps an inline
+`TemplateBody` at 51,200 bytes, and this template now embeds the P1.1
+credential-sync Lambda source inline and exceeds that limit. Passing `--s3-bucket`
+makes the CLI upload the template and reference it by `TemplateURL` instead, which
+raises the limit to 1 MB. Without these two flags the deploy fails with
+`Template body length cannot exceed 51200 bytes`.
+
+`RdsMasterSecretArn` is new in P1.1 and is required: it is the ARN of the
+RDS-managed master secret (the one whose name begins `rds!db-`) and is the
+authoritative credential the sync function reads.
+
+`CredentialSyncScheduleExpression` is also new but optional; it defaults to
+`rate(5 minutes)`.
+
+The upload bucket (`swapify-cfn-templates-588170396448-us-east-1`) is private,
+SSE-encrypted, blocks all public access, and expires uploaded templates after30days.
+It holds no application data.
 
 ECS performs a rolling update; the ALB health check gates traffic:
 
