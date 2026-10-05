@@ -1003,9 +1003,14 @@ Resources:
               # is a long-running task with the secret baked in at launch, so a
               # new deployment is the only way it picks up a rotated credential.
               # The reconciler needs nothing here: it gets a fresh task per run.
+              #
+              # ${ApiService.Name}, NOT ${ApiService}: Ref on an AWS::ECS::Service
+              # returns the service ARN, not its name, so Ref here would produce
+              # a doubly-nested ARN that matches nothing and silently deny the
+              # redeploy at rotation time.
               - Effect: Allow
                 Action: ecs:UpdateService
-                Resource: !Sub "arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:service/${Cluster}/${ApiService}"
+                Resource: !Sub "arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:service/${Cluster}/${ApiService.Name}"
         - PolicyName: WriteOwnLogs
           PolicyDocument:
             Version: "2012-10-17"
@@ -1262,6 +1267,12 @@ Resources:
                   _emit("DriftDetected", 0)
                   _emit("ConsecutiveDriftPolls", 0)
                   _emit("Settling", 0)
+                      # A clean poll must publish zeroes as well as healthy signals.
+                      # These two metrics are otherwise only ever emitted on the failing
+                      # path, so their alarms would latch in ALARM permanently after a
+                      # single transient failure and mask every later occurrence.
+                  _emit("SyncFailed", 0)
+                  _emit("ApiRedeployFailed", 0)
                   LOG.info(
                       "no drift: authoritative version %s already synchronised",
                       current_version,
@@ -1295,6 +1306,7 @@ Resources:
                       age_seconds,
                       SETTLE_SECONDS,
                   )
+                  _emit("SyncFailed", 0)
                   return {"action": "settling", "authoritativeVersionId": current_version}
 
               if observed_count < REQUIRED_STABLE_POLLS:
@@ -1304,6 +1316,7 @@ Resources:
                       observed_count,
                       REQUIRED_STABLE_POLLS,
                   )
+                  _emit("SyncFailed", 0)
                   return {
                       "action": "awaiting_stability",
                       "authoritativeVersionId": current_version,
@@ -1394,7 +1407,9 @@ Resources:
           APP_DATABASE_URL_SECRET_ARN: !Ref DatabaseUrlSecretArn
           STATE_PARAMETER_NAME: !Sub "/swapify/${EnvName}/credential-sync/rds-source-version"
           ECS_CLUSTER_NAME: !Ref Cluster
-          ECS_SERVICE_NAME: !Ref ApiService
+          # GetAtt Name, not Ref: Ref returns the service ARN here, and
+          # ecs:UpdateService expects a bare service name.
+          ECS_SERVICE_NAME: !GetAtt ApiService.Name
           # Do not copy a credential out of a rotation that may still be
           # finishing; require the authoritative version to be quiet and stable.
           SETTLE_SECONDS: "600"

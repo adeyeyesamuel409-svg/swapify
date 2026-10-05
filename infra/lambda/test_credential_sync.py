@@ -186,6 +186,12 @@ class NoOpTests(unittest.TestCase):
         self.assertEqual(cw.value("Heartbeat"), [1.0])
         self.assertEqual(cw.value("DriftDetected"), [0.0])
         self.assertEqual(cw.value("SyncSucceeded"), [])
+        # A clean poll must publish zeroes for the failure metrics too. They are
+        # only ever emitted as 1 on a failing run, so without this the failure
+        # and redeploy-failed alarms latch in ALARM forever after one transient
+        # failure and mask every subsequent occurrence.
+        self.assertEqual(cw.value("SyncFailed"), [0.0])
+        self.assertEqual(cw.value("ApiRedeployFailed"), [0.0])
 
     def test_noop_does_not_read_any_secret_value(self):
         sm = FakeSecrets("v1", ["AWSCURRENT"], NOW - 10_000, APP_URL, RDS_PASSWORD)
@@ -398,6 +404,55 @@ class TemplateDriftGuardTests(unittest.TestCase):
         with open(os.path.join(HERE, "credential_sync.py"), "r", encoding="utf-8") as fh:
             source = fh.read()
         self.assertEqual(inline.strip(), source.strip(), "template Lambda code is stale")
+
+    def test_ecs_service_reference_yields_a_bare_name_not_an_arn(self):
+        """Regression: Ref on AWS::ECS::Service returns the service ARN.
+
+        Using ${ApiService} in the UpdateService IAM policy produced a
+        doubly-nested ARN that matched nothing, so the redeploy was denied and
+        the API would have kept a stale credential at rotation time. IAM
+        simulation passed anyway because it asserted a hand-written ARN rather
+        than the value the template actually resolves to, so this guard asserts
+        the shape of the template itself.
+        """
+        import yaml
+
+        class CfnLoader(yaml.SafeLoader):
+            pass
+
+        CfnLoader.add_multi_constructor(
+            "!", lambda loader, suffix, node: loader.construct_scalar(node)
+        )
+
+        tpl_path = os.path.join(HERE, "..", "cloudformation", "ecs.yml")
+        if not os.path.exists(tpl_path):
+            self.skipTest("template not present")
+        with open(tpl_path, "r", encoding="utf-8") as fh:
+            doc = yaml.load(fh, Loader=CfnLoader)
+        if "CredentialSyncFunctionRole" not in doc["Resources"]:
+            self.skipTest("CredentialSyncFunctionRole not yet present")
+
+        role = doc["Resources"]["CredentialSyncFunctionRole"]["Properties"]
+        arn = None
+        for policy in role["Policies"]:
+            if policy["PolicyName"] == "RedeployApiService":
+                arn = policy["PolicyDocument"]["Statement"][0]["Resource"]
+        self.assertIsNotNone(arn, "RedeployApiService policy missing")
+
+        # Only the leading "arn:" may appear. A nested one means an ARN was
+        # interpolated into another ARN, which is what Ref on the service caused.
+        self.assertEqual(arn.count("arn:"), 1, "UpdateService ARN is doubly nested: %s" % arn)
+        self.assertIn("${Cluster}", arn)
+        self.assertIn("${ApiService.Name}", arn, "must use GetAtt Name, not Ref, for the service")
+        stripped = arn.replace("${ApiService.Name}", "")
+        self.assertNotIn("${ApiService}", stripped, "Ref on AWS::ECS::Service yields the full ARN")
+
+        env = doc["Resources"]["CredentialSyncFunction"]["Properties"]["Environment"]["Variables"]
+        self.assertIn("ApiService.Name", str(env["ECS_SERVICE_NAME"]), "ECS_SERVICE_NAME must be the bare service name")
+        # The loader renders !Ref Cluster as the bare resource name. Ref on an
+        # AWS::ECS::Cluster yields the cluster name, which is what UpdateService
+        # wants, so unlike the service this one must be a Ref and not a GetAtt.
+        self.assertEqual(env["ECS_CLUSTER_NAME"], "Cluster", "ECS_CLUSTER_NAME must be !Ref Cluster")
 
 
 if __name__ == "__main__":

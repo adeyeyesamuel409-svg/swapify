@@ -216,6 +216,12 @@ def _poll(force_now=None):
         _emit("DriftDetected", 0)
         _emit("ConsecutiveDriftPolls", 0)
         _emit("Settling", 0)
+            # A clean poll must publish zeroes as well as healthy signals.
+            # These two metrics are otherwise only ever emitted on the failing
+            # path, so their alarms would latch in ALARM permanently after a
+            # single transient failure and mask every later occurrence.
+        _emit("SyncFailed", 0)
+        _emit("ApiRedeployFailed", 0)
         LOG.info(
             "no drift: authoritative version %s already synchronised",
             current_version,
@@ -249,6 +255,7 @@ def _poll(force_now=None):
             age_seconds,
             SETTLE_SECONDS,
         )
+        _emit("SyncFailed", 0)
         return {"action": "settling", "authoritativeVersionId": current_version}
 
     if observed_count < REQUIRED_STABLE_POLLS:
@@ -258,6 +265,7 @@ def _poll(force_now=None):
             observed_count,
             REQUIRED_STABLE_POLLS,
         )
+        _emit("SyncFailed", 0)
         return {
             "action": "awaiting_stability",
             "authoritativeVersionId": current_version,
