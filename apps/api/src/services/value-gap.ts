@@ -1,5 +1,6 @@
 import { ValueGapState, ShipmentStatus, PaymentStatus, Prisma, prisma } from '@swapify/db';
 import { creditValueGap } from './balance.js';
+import { isPaymentDisputeFrozen } from './disputes.js';
 import pino from 'pino';
 
 const log = pino({ name: 'value-gap', level: process.env.LOG_LEVEL ?? 'info' });
@@ -224,6 +225,27 @@ export async function releaseValueGap(
     return null;
   }
 
+  // R2 freeze: an open charge dispute means Stripe is holding (or has taken)
+  // this money. Crediting the recipient now would pay them from funds Swapify
+  // no longer controls. Refusing keeps the gap HELD, which reconcileValueGaps
+  // keeps surfacing until the dispute is resolved.
+  const disputedPayment = await tx.payment.findUnique({
+    where: { id: valueGap.paymentId },
+    select: { id: true, stripeDisputeId: true, disputeOutcome: true },
+  });
+  if (disputedPayment && isPaymentDisputeFrozen(disputedPayment)) {
+    log.error(
+      {
+        swapId,
+        valueGapId: valueGap.id,
+        paymentId: valueGap.paymentId,
+        disputeId: disputedPayment.stripeDisputeId,
+      },
+      'ANOMALY: refusing to release ValueGap — charge dispute is open and the payment is frozen. No balance was credited.',
+    );
+    return null;
+  }
+
   const now = new Date();
 
   // Conditionally claim the ValueGap (HELD → RELEASED).
@@ -338,6 +360,26 @@ export async function refundValueGap(
   if (valueGap.state === ValueGapState.REFUNDED) {
     log.info({ paymentId, valueGapId: valueGap.id }, 'ValueGap already REFUNDED');
     return true;
+  }
+
+  // R2 freeze: while a charge dispute is open the cardholder is being made
+  // whole through the dispute process. Marking the gap REFUNDED here would
+  // claim money was returned when no Stripe Refund exists.
+  const disputedPayment = await tx.payment.findUnique({
+    where: { id: valueGap.paymentId },
+    select: { id: true, stripeDisputeId: true, disputeOutcome: true },
+  });
+  if (disputedPayment && isPaymentDisputeFrozen(disputedPayment)) {
+    log.error(
+      {
+        paymentId,
+        valueGapId: valueGap.id,
+        disputeId: disputedPayment.stripeDisputeId,
+        reason,
+      },
+      'ANOMALY: refusing to mark ValueGap REFUNDED — charge dispute is open and no Stripe Refund exists. ValueGap left unchanged.',
+    );
+    return false;
   }
 
   if (valueGap.state === ValueGapState.RELEASED) {

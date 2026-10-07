@@ -210,6 +210,40 @@ enum PaymentStatus {
   FAILED
 }
 
+// Durable outcome of a Stripe charge dispute. A dispute is NOT a refund: it is
+// a cardholder review that Stripe adjudicates. Swapify only records what Stripe
+// reports and never derives refund state from it.
+//
+//   OPEN       dispute recorded, still under review (payment frozen)
+//   WON        Stripe returned the funds to the platform (final)
+//   LOST       Stripe did not return the funds (final)
+//   PREVENTED  resolved in our favour without a chargeback (final)
+//   UNKNOWN    warning_closed / unparseable status — frozen, manual review
+//
+// Freeze rule: a payment is frozen while stripeDisputeId IS NOT NULL and
+// outcome is NOT WON/PREVENTED.
+enum DisputeOutcome {
+  OPEN
+  WON
+  LOST
+  PREVENTED
+  UNKNOWN
+}
+
+// Durable state of the Stripe transfer reversal attempted when a dispute opens
+// against a ValueGap that has already been RELEASED (funds already sent to the
+// connected account). Uses the pre-existing reverseTransfer service and its
+// deterministic idempotency key transfer-reversal:{valueGapId}.
+//
+//   PENDING  intent recorded, attempt outstanding or outcome unknown — retried
+//   REVERSED Stripe confirmed the reversal
+//   FAILED   definite rejection — bounded retries then manual resolution
+enum DisputeReversalState {
+  PENDING
+  REVERSED
+  FAILED
+}
+
 // ---------------------------------------------------------------------------
 // Value-gap internal ledger
 // ---------------------------------------------------------------------------
@@ -245,6 +279,26 @@ model Payment {
   // instances or retried after a crash.
   stripeRefundId          String?
   refundedAt              DateTime?
+
+  // --- Charge dispute state (R2) ------------------------------------------------
+  // A dispute is NOT a refund. These fields are the ONLY durable record of a
+  // Stripe dispute, and they are written exclusively by services/disputes.ts.
+  // refundedAt / stripeRefundId above are NEVER written from a dispute event:
+  // refundedAt means "a confirmed Stripe Refund object exists" and nothing else.
+  //
+  // stripeDisputeId is unique so concurrent or redelivered dispute events
+  // cannot claim the same payment twice (same pattern as stripeCheckoutSessionId).
+  stripeDisputeId         String?       @unique
+  // Raw Stripe Dispute.status / reason, refreshed by charge.dispute.updated.
+  disputeStatus           String?
+  disputeReason           String?
+  // Latched final outcome. Null or OPEN means the payment stays frozen.
+  disputeOutcome          DisputeOutcome?
+  disputeOpenedAt         DateTime?
+  disputeClosedAt         DateTime?
+  // Stripe Event.created of the last applied dispute event. Used to reject
+  // stale/out-of-order updated+closed deliveries.
+  disputeEventAt          Int?
 
   // Internal value-gap ledger record for this payment (1:1)
   valueGap                ValueGap?
@@ -298,6 +352,23 @@ model ValueGap {
   // External payout reference (future use — not implemented yet)
   externalPayoutRef String?
 
+  // --- Dispute transfer reversal (R2) ------------------------------------------
+  // Set when a charge dispute opens against a payment whose ValueGap has
+  // ALREADY been RELEASED with an issued Stripe transfer. Records the attempt
+  // to claw the transferred funds back via the pre-existing reverseTransfer
+  // service (idempotency key transfer-reversal:{valueGapId}).
+  //
+  // null                no reversal required (gap not released, or not disputed)
+  // PENDING             intent recorded; attempt outstanding or outcome unknown
+  // REVERSED            Stripe confirmed the reversal
+  // FAILED              definite rejection; bounded retries, then manual ops
+  //
+  // releaseReason is deliberately NOT reused for this — it must keep carrying
+  // the original release reason (SWAP_COMPLETED etc.).
+  disputeReversalState    DisputeReversalState?
+  disputeReversalAttempts Int                  @default(0)
+  disputeReversalAt       DateTime?
+
   // Balance credit generated when this value gap is released (1:1)
   balanceEntry BalanceEntry?
 
@@ -306,6 +377,7 @@ model ValueGap {
   @@index([recipientUserId])
   @@index([state])
   @@index([createdAt])
+  @@index([disputeReversalState])
 }
 
 // ---------------------------------------------------------------------------
@@ -626,6 +698,40 @@ model PayoutWebhookObservation {
 
   @@index([stripePayoutId])
   @@index([consumed])
+}
+
+// ---------------------------------------------------------------------------
+// Durable capture of every Stripe charge-dispute webhook event (R2).
+//
+// The webhook writes the event here BEFORE attempting to apply it, so a
+// dispute that arrives before the local Payment row is linked to its
+// payment_intent (checkout.session.completed not yet processed) is never lost.
+// Unconsumed rows are replayed by reconcileDisputes().
+//
+// stripeEventId is unique: Stripe redelivers the same event with the same id,
+// so an upsert is a no-op and processing stays idempotent. Logical idempotency
+// is enforced separately by Payment.stripeDisputeId uniqueness.
+// ---------------------------------------------------------------------------
+
+model DisputeEventObservation {
+  id             String   @id @default(cuid())
+  stripeEventId  String   @unique
+  stripeDisputeId String
+  eventType      String   // charge.dispute.created | .updated | .closed
+  paymentIntentId String?
+  disputeStatus  String?
+  disputeReason  String?
+  // Stripe Event.created (unix seconds) — ordering key for stale rejection.
+  eventCreated   Int?
+  // True once the event has been applied (or is known to need no further work).
+  consumed       Boolean  @default(false)
+  consumedAt     DateTime?
+  // Bounded replay counter so an unmatched charge cannot spin forever.
+  attempts       Int      @default(0)
+  createdAt      DateTime @default(now())
+
+  @@index([consumed])
+  @@index([stripeDisputeId])
 }
 
 // ---------------------------------------------------------------------------

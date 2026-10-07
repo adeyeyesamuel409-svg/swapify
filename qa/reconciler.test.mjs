@@ -558,25 +558,36 @@ console.log('OK');
 // them would run against a production schema that does not have those columns.
 //
 // Phase R1 adds exactly ONE approved migration on top of that baseline: the
-// withdrawal payout claim + settlement markers. Any other addition would mean
-// an unapproved production migration was introduced.
+// withdrawal payout claim + settlement markers. Phase R2 adds a second: the
+// charge-dispute lifecycle state. Any other addition would mean an unapproved
+// production migration was introduced.
 //
 // These are negative assertions on purpose. They are the checks that would fail
 // if unreleased work leaked into this tree, which is exactly the regression this
 // release must prevent.
 // ---------------------------------------------------------------------------
 
+// Still unreleased: R3.31's separate `disputedAt` alias and the R3.33 checkout
+// concurrency claim columns. R2 deliberately does not adopt them — it records
+// disputes only on the approved fields below.
 const UNRELEASED_PAYMENT_FIELDS = [
-  'stripeDisputeId',
-  'disputeReason',
-  'disputeStatus',
   'disputedAt',
-  'disputeOutcome',
-  'disputeClosedAt',
-  'disputeEventAt',
   'checkoutAttempt',
   'checkoutAttemptKey',
   'checkoutAttemptClaimedAt',
+];
+
+// Approved by R2. Asserted to be PRESENT so this isolation check cannot be
+// satisfied by silently deleting R2's dispute work.
+const APPROVED_R2_DISPUTE_FIELDS = [
+  'stripeDisputeId',
+  'disputeStatus',
+  'disputeReason',
+  'disputeOutcome',
+  'disputeClosedAt',
+  'disputeEventAt',
+  'disputeReversalState',
+  'DisputeEventObservation',
 ];
 
 const UNRELEASED_MIGRATIONS = [
@@ -586,12 +597,13 @@ const UNRELEASED_MIGRATIONS = [
 ];
 
 const APPROVED_R1_MIGRATION = '20261005000000_withdrawal_payout_claim_settlement';
+const APPROVED_R2_MIGRATION = '20261006000000_dispute_lifecycle_state';
 const PRODUCTION_BASELINE_MIGRATIONS = 13;
 
 const MIGRATIONS_DIR = new URL('../packages/db/prisma/migrations/', import.meta.url);
 const SCHEMA = readFileSync(new URL('../packages/db/prisma/schema.prisma', import.meta.url), 'utf8');
 
-check('this release adds only the approved R1 migration, never the unreleased R3.31-R3.33 ones', () => {
+check('this release adds only the approved R1+R2 migrations, never the unreleased R3.31-R3.33 ones', () => {
   const present = readdirSync(MIGRATIONS_DIR, { withFileTypes: true })
     .filter((d) => d.isDirectory())
     .map((d) => d.name);
@@ -605,11 +617,17 @@ check('this release adds only the approved R1 migration, never the unreleased R3
     present.includes(APPROVED_R1_MIGRATION),
     `the approved R1 migration ${APPROVED_R1_MIGRATION} must be present`,
   );
-  const withoutR1 = present.filter((name) => name !== APPROVED_R1_MIGRATION);
+  assert.ok(
+    present.includes(APPROVED_R2_MIGRATION),
+    `the approved R2 migration ${APPROVED_R2_MIGRATION} must be present`,
+  );
+  const withoutApproved = present.filter(
+    (name) => name !== APPROVED_R1_MIGRATION && name !== APPROVED_R2_MIGRATION,
+  );
   assert.equal(
-    withoutR1.length,
+    withoutApproved.length,
     PRODUCTION_BASELINE_MIGRATIONS,
-    `expected the 13-migration production baseline plus the single approved R1 migration, found ${present.length}`,
+    `expected the 13-migration production baseline plus approved R1 and R2 migrations, found ${present.length}`,
   );
 });
 
@@ -618,6 +636,15 @@ check('the production schema exposes none of the unreleased Payment fields', () 
     assert.ok(
       !new RegExp(`\\b${field}\\b`).test(SCHEMA),
       `schema.prisma must not declare ${field} (unreleased column)`,
+    );
+  }
+});
+
+check('the production schema declares the approved R2 dispute fields', () => {
+  for (const field of APPROVED_R2_DISPUTE_FIELDS) {
+    assert.ok(
+      new RegExp(`\\b${field}\\b`).test(SCHEMA),
+      `schema.prisma must declare ${field} (approved by R2)`,
     );
   }
 });

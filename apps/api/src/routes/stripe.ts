@@ -2,6 +2,11 @@ import { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { markPaymentPaid, parseWebhookEvent, simulationAllowed } from '../services/stripe.js';
 import { syncConnectedAccountStatus } from '../services/stripe-connect.js';
 import { handlePayoutWebhook } from '../services/withdrawal.js';
+import {
+  buildDisputeEvent,
+  handleChargeDisputeWebhook,
+  type ChargeDisputeEventType,
+} from '../services/disputes.js';
 import { prisma } from '@swapify/db';
 import pino from 'pino';
 
@@ -119,30 +124,44 @@ const stripeRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
           }
         } else if (eventType === 'transfer.updated') {
           log.info({ transferId: obj.id, eventType }, 'Transfer event received');
-        } else if (eventType === 'charge.dispute.created') {
-          const disputeId = obj.id as string;
-          const paymentIntentId = typeof obj.payment_intent === 'string'
-            ? obj.payment_intent
-            : (obj.payment_intent as { id: string } | null)?.id;
-          if (paymentIntentId) {
-            try {
-              await prisma.payment.updateMany({
-                where: { stripePaymentIntentId: paymentIntentId },
-                data: { refundedAt: new Date(), stripeRefundId: disputeId },
-              });
-              log.warn(
-                { disputeId, paymentIntentId, reason: obj.reason },
-                'Charge dispute created — payment flagged for review',
-              );
-            } catch (err) {
-              log.error({ err, disputeId }, 'Failed to record dispute');
-            }
+        } else if (
+          eventType === 'charge.dispute.created' ||
+          eventType === 'charge.dispute.updated' ||
+          eventType === 'charge.dispute.closed'
+        ) {
+          // Deliberately routed, not left to the "Unhandled" default below.
+          // A dispute is NOT a refund: it is recorded durably, the payment is
+          // frozen, and refundedAt/stripeRefundId are never touched here. Any
+          // failure propagates so we answer 500 and Stripe redelivers (the
+          // event is already durably captured, so replay is idempotent).
+          try {
+            const disputeEvent = buildDisputeEvent(
+              eventType as ChargeDisputeEventType,
+              obj,
+              typeof event.created === 'number' ? event.created : null,
+              event.id,
+            );
+            const result = await handleChargeDisputeWebhook(disputeEvent);
+            request.log.warn(
+              {
+                disputeId: disputeEvent.dispute.id,
+                paymentIntentId: disputeEvent.dispute.paymentIntentId,
+                outcome: result.outcome,
+                reversalState: result.reversalState,
+              },
+              'Charge dispute event processed',
+            );
+          } catch (err) {
+            request.log.error(
+              { err, eventType, disputeId: obj.id as string },
+              'Failed to process charge dispute event',
+            );
+            return reply.code(500).send({ error: 'Failed to process dispute event' });
           }
         } else {
           request.log.debug({ eventType }, 'Unhandled Stripe webhook event');
         }
       }
-        request.log.debug({ eventType: event.type }, 'Unhandled Stripe webhook event');
     }
 
     return reply.code(200).send({ received: true });

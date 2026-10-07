@@ -19,10 +19,12 @@ const log = pino({ name: 'reconciler', level: process.env.LOG_LEVEL ?? 'info' })
 //     2. reconcileRefunds()                   refundedAt guard + Stripe idem key
 //     3. reconcileValueGaps()                 HELD -> REFUNDED/RELEASED + credit
 //     4. reconcileWithdrawals()               stale payouts, out-of-order payouts
+//     5. reconcileDisputes()                  replay captured dispute events,
+//                                              retry transfer reversals (R2)
 //
-// This is the production baseline cycle (image b084e2b) unchanged: this
-// release adds scheduling and ownership only, and introduces no new
-// reconciliation step.
+// This is the production baseline cycle (image b084e2b) unchanged in its
+// scheduling and ownership: the worker owns scheduling, not business logic.
+// R2 adds step 5 as business logic inside the same single-cycle entry point.
 //
 // Nothing is duplicated here on purpose: the worker owns scheduling, not
 // business logic. Per-item isolation is unchanged — expireExpiredSwaps() already

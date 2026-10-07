@@ -4,6 +4,7 @@ import { HttpError } from './swaps.js';
 import { notify } from './notifications.js';
 import { createSwapShipments } from './shipping.js';
 import { allocateValueGap, refundValueGap } from './value-gap.js';
+import { isPaymentDisputeFrozen } from './disputes.js';
 import pino from 'pino';
 
 const log = pino({ name: 'stripe', level: process.env.LOG_LEVEL ?? 'info' });
@@ -209,15 +210,29 @@ export async function markPaymentPaid(
 //   payment id, so a retry can never mint a second refund.
 // - On success the refund is durably recorded on the Payment row with a
 //   conditional update (`where refundedAt: null`).
+//
+// Dispute safety (R2): a payment with an open charge dispute is refused
+// before any ledger or Stripe movement. refundedAt / stripeRefundId are
+// written ONLY in the conditional update that follows a confirmed Stripe
+// Refund object — never from a dispute event, never before confirmation.
 export async function refundSwapPayment(paymentId: string): Promise<void> {
   const payment = await prisma.payment.findUnique({ where: { id: paymentId } });
   if (!payment || payment.status !== PaymentStatus.PAID || payment.refundedAt) {
     return;
   }
+  // R2: the payer is the cardholder, so an open dispute is already returning
+  // (or holding) their money. A second refund would double-return it.
+  if (isPaymentDisputeFrozen(payment)) {
+    log.error(
+      { paymentId, disputeId: payment.stripeDisputeId, outcome: payment.disputeOutcome },
+      'ANOMALY: refusing to refund a payment with an open charge dispute — the dispute process owns the funds. No Stripe refund and no ledger change were made.',
+    );
+    return;
+  }
   if (!payment.stripePaymentIntentId) {
     return; // simulated payment - nothing was charged
   }
-  if (!stripeEnabled) {
+  if (!stripeEnabled && !createStripeRefundImpl) {
     return; // simulated flow - no real charge exists
   }
 
@@ -272,18 +287,76 @@ export async function refundSwapPayment(paymentId: string): Promise<void> {
     return;
   }
 
+  let refundId: string;
   try {
-    const refund = await getStripe().refunds.create(
-      { payment_intent: payment.stripePaymentIntentId },
-      { idempotencyKey: `refund-${payment.id}` },
+    refundId = await createConfirmedRefund(
+      payment.stripePaymentIntentId,
+      `refund-${payment.id}`,
     );
-    await prisma.payment.updateMany({
-      where: { id: payment.id, refundedAt: null },
-      data: { refundedAt: new Date(), stripeRefundId: refund.id },
-    });
   } catch (err) {
-    log.error({ err, paymentId }, 'Failed to refund payment');
+    // Definite rejection AND unknown outcome (timeout / 5xx / 429 / process
+    // death) both land here and are treated identically: NOTHING is recorded.
+    // refundedAt and stripeRefundId stay NULL, which keeps reconcileRefunds()
+    // eligible for this payment. The retry reuses the same deterministic
+    // idempotency key, so Stripe can never produce a second refund.
+    log.error(
+      { err, paymentId },
+      'Stripe refund not confirmed — refund NOT recorded, reconciliation will retry under the same idempotency key',
+    );
+    return;
   }
+
+  const recorded = await prisma.payment.updateMany({
+    where: { id: payment.id, refundedAt: null },
+    data: { refundedAt: new Date(), stripeRefundId: refundId },
+  });
+  if (recorded.count === 0) {
+    log.warn(
+      { paymentId, refundId },
+      'Refund already recorded by a concurrent confirmation — keeping the first confirmed Stripe refund id',
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Refund creation seam
+//
+// Production uses stripe.refunds.create; tests inject a deterministic stub so
+// no Stripe financial call is ever made from the test harness (mirrors
+// setDisbursementProvider in value-gap.ts).
+// ---------------------------------------------------------------------------
+
+export interface ConfirmedStripeRefund {
+  id: string;
+}
+
+export type CreateStripeRefundFn = (
+  paymentIntentId: string,
+  idempotencyKey: string,
+) => Promise<ConfirmedStripeRefund>;
+
+let createStripeRefundImpl: CreateStripeRefundFn | null = null;
+
+export function setCreateStripeRefundImpl(fn: CreateStripeRefundFn | null): void {
+  createStripeRefundImpl = fn;
+}
+
+async function createConfirmedRefund(
+  paymentIntentId: string,
+  idempotencyKey: string,
+): Promise<string> {
+  if (createStripeRefundImpl) {
+    const refund = await createStripeRefundImpl(paymentIntentId, idempotencyKey);
+    if (!refund || typeof refund.id !== 'string' || !refund.id) {
+      throw new Error('Refund creator returned no refund id');
+    }
+    return refund.id;
+  }
+  const refund = await getStripe().refunds.create(
+    { payment_intent: paymentIntentId },
+    { idempotencyKey },
+  );
+  return refund.id;
 }
 
 // Verifies a Stripe webhook signature and returns the typed event.

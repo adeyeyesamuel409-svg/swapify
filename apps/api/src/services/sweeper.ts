@@ -3,6 +3,7 @@ import { refundSwapPayment } from './stripe.js';
 import { cancelSwapShipments } from './shipping.js';
 import { reconcileValueGaps } from './value-gap.js';
 import { reconcileWithdrawals } from './withdrawal.js';
+import { reconcileDisputes } from './disputes.js';
 import pino from 'pino';
 
 const log = pino({ name: 'swap-sweeper', level: process.env.LOG_LEVEL ?? 'info' });
@@ -122,6 +123,20 @@ export async function expireExpiredSwaps(): Promise<number> {
     }
   } catch (err) {
     log.error({ err }, 'Failed to reconcile withdrawals');
+  }
+
+  // R2: replay dispute events that could not be applied when they arrived
+  // (payment_intent not linked yet, or the handler failed after durable
+  // capture) and retry any outstanding dispute transfer reversal. Both are
+  // idempotent: event replay is CAS-guarded on stripeDisputeId and the
+  // reversal uses the deterministic transfer-reversal:{valueGapId} key.
+  try {
+    const disputes = await reconcileDisputes();
+    if (disputes.replayed > 0 || disputes.reversals > 0) {
+      log.info({ ...disputes }, 'Reconciled charge disputes');
+    }
+  } catch (err) {
+    log.error({ err }, 'Failed to reconcile charge disputes');
   }
 
   return expiredCount;
