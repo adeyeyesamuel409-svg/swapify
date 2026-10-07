@@ -24,9 +24,9 @@ async function createUser(name) {
   });
 }
 
-async function createBalanceAccount(userId, availablePence = 0) {
+async function createBalanceAccount(userId, availablePence = 0, pendingPence = 0) {
   return prisma.balanceAccount.create({
-    data: { userId, currency: 'GBP', availableBalancePence: availablePence, pendingBalancePence: 0 },
+    data: { userId, currency: 'GBP', availableBalancePence: availablePence, pendingBalancePence: pendingPence },
   });
 }
 
@@ -410,7 +410,9 @@ check('Minimum withdrawal amount enforced', async () => {
 
 check('handlePayoutWebhook is idempotent', async () => {
   const user = await createUser('w-idem');
-  const account = await createBalanceAccount(user.id, 0);
+  // A PROCESSING withdrawal always holds its reservation in pending (I-P), so
+  // the fixture must model the reservation rather than an empty account.
+  const account = await createBalanceAccount(user.id, 0, 1000);
   const pm = await createPayoutMethod(user.id);
   try {
     const w = await prisma.withdrawal.create({
@@ -440,7 +442,8 @@ check('handlePayoutWebhook is idempotent', async () => {
 
 check('handlePayoutWebhook failed reverses balance', async () => {
   const user = await createUser('w-fail');
-  const account = await createBalanceAccount(user.id, 0);
+  // Reservation held in pending (I-P); the reversal must return it.
+  const account = await createBalanceAccount(user.id, 0, 1000);
   const pm = await createPayoutMethod(user.id);
   try {
     const w = await prisma.withdrawal.create({
@@ -475,7 +478,8 @@ check('handlePayoutWebhook failed reverses balance', async () => {
 
 check('handlePayoutWebhook canceled reverses balance', async () => {
   const user = await createUser('w-cancel');
-  const account = await createBalanceAccount(user.id, 0);
+  // Reservation held in pending (I-P); the reversal must return it.
+  const account = await createBalanceAccount(user.id, 0, 1000);
   const pm = await createPayoutMethod(user.id);
   try {
     const w = await prisma.withdrawal.create({

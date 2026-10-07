@@ -549,13 +549,17 @@ console.log('OK');
 // (missing Stripe, missing database) are verified end-to-end above.
 
 // ---------------------------------------------------------------------------
-// 10. Isolation from unreleased phases (R3.35A)
+// 10. Isolation from unreleased phases (R3.35A) + Phase R1
 //
 // R3.35 is released on the production baseline (image b084e2b, 13 migrations).
 // R3.31/R3.32/R3.33 add Payment columns behind three unreleased migrations, and
 // R3.34 adds payout-webhook recovery. None of them are in production, so this
 // release must neither require their migrations nor carry their code: shipping
 // them would run against a production schema that does not have those columns.
+//
+// Phase R1 adds exactly ONE approved migration on top of that baseline: the
+// withdrawal payout claim + settlement markers. Any other addition would mean
+// an unapproved production migration was introduced.
 //
 // These are negative assertions on purpose. They are the checks that would fail
 // if unreleased work leaked into this tree, which is exactly the regression this
@@ -581,10 +585,13 @@ const UNRELEASED_MIGRATIONS = [
   '20260930000000_add_payment_checkout_concurrency',
 ];
 
+const APPROVED_R1_MIGRATION = '20261005000000_withdrawal_payout_claim_settlement';
+const PRODUCTION_BASELINE_MIGRATIONS = 13;
+
 const MIGRATIONS_DIR = new URL('../packages/db/prisma/migrations/', import.meta.url);
 const SCHEMA = readFileSync(new URL('../packages/db/prisma/schema.prisma', import.meta.url), 'utf8');
 
-check('this release requires none of the unreleased R3.31-R3.33 migrations', () => {
+check('this release adds only the approved R1 migration, never the unreleased R3.31-R3.33 ones', () => {
   const present = readdirSync(MIGRATIONS_DIR, { withFileTypes: true })
     .filter((d) => d.isDirectory())
     .map((d) => d.name);
@@ -594,9 +601,16 @@ check('this release requires none of the unreleased R3.31-R3.33 migrations', () 
       `unreleased migration ${migration} must not be in the isolated tree`,
     );
   }
-  // The baseline release is 13 migrations. A 14th here would mean a new
-  // production migration was introduced, which this phase must never do.
-  assert.equal(present.length, 13, `expected the 13-migration baseline, found ${present.length}`);
+  assert.ok(
+    present.includes(APPROVED_R1_MIGRATION),
+    `the approved R1 migration ${APPROVED_R1_MIGRATION} must be present`,
+  );
+  const withoutR1 = present.filter((name) => name !== APPROVED_R1_MIGRATION);
+  assert.equal(
+    withoutR1.length,
+    PRODUCTION_BASELINE_MIGRATIONS,
+    `expected the 13-migration production baseline plus the single approved R1 migration, found ${present.length}`,
+  );
 });
 
 check('the production schema exposes none of the unreleased Payment fields', () => {

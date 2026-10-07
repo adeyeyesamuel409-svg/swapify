@@ -325,7 +325,7 @@ check('PayoutMethod relation to Withdrawal works', async () => {
 check('Withdrawal enum values are correct', async () => {
   const user = await createUser('w-12');
   const pm = await createPayoutMethod(user.id);
-  const statuses = ['PENDING', 'APPROVED', 'PROCESSING', 'COMPLETED', 'FAILED', 'CANCELLED'];
+    const statuses = ['PENDING', 'APPROVED', 'PROCESSING', 'PAYOUT_CREATING', 'COMPLETED', 'FAILED', 'CANCELLED'];
   try {
     for (let i = 0; i < statuses.length; i++) {
       const w = await prisma.withdrawal.create({

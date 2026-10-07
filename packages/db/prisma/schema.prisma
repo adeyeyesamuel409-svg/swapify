@@ -507,12 +507,14 @@ enum PayoutMethodType {
 }
 
 enum WithdrawalStatus {
-  PENDING      // withdrawal requested, pending validation
-  APPROVED     // validated, awaiting payout creation
-  PROCESSING   // payout created on Stripe connected account
-  COMPLETED    // payout confirmed by Stripe (arrived in bank)
-  FAILED       // payout failed (insufficient funds, bank error)
-  CANCELLED    // user or admin cancelled before payout
+  PENDING         // withdrawal requested, reservation held, not yet claimed for payout
+  APPROVED        // legacy value retained for enum compatibility (unused)
+  PAYOUT_CREATING // durable claim taken: Stripe payout attempt in flight or its result
+                  // unknown. Reservation held. Cancellation is NOT permitted.
+  PROCESSING      // stripePayoutId persisted; payout created on Stripe connected account
+  COMPLETED       // payout confirmed by Stripe. Settled only when settledAt is set.
+  FAILED          // payout failed / rejected. Settled and reversed only when reversedAt is set.
+  CANCELLED       // cancelled before the payout claim. Reversed only when reversedAt is set.
 }
 
 // PayoutMethod tracks the destination for withdrawals. Bank account details
@@ -566,7 +568,26 @@ model Withdrawal {
   // Fee handling (reserved for future use; currently always 0)
   feePence        Int              @default(0)
 
-  // Reversal tracking — if payout fails, amount is credited back
+  // Durable payout claim (R1). Set atomically with the PENDING ->
+  // PAYOUT_CREATING transition, BEFORE Stripe is contacted. Proves that one
+  // worker owns this payout attempt and that cancellation can no longer return
+  // the reservation. payoutClaimId is a correlation marker only -- it is NOT an
+  // idempotency key. Stripe idempotency remains idempotencyKey, and
+  // stripePayoutId remains @unique.
+  payoutClaimedAt DateTime?
+  payoutClaimId   String?
+
+  // Settlement marker (R1). Set in the SAME transaction that releases the
+  // pending reservation for a terminal financial state. settledAt IS NOT NULL
+  // means "the reservation required by this terminal state has been released".
+  // COMPLETED status alone does NOT imply settledAt -- see the recoverable
+  // completed-but-unsettled intermediate state.
+  settledAt       DateTime?
+
+  // Reversal tracking -- if payout fails, amount is credited back.
+  // Set in the SAME transaction that returns availableBalancePence, releases
+  // pendingBalancePence, and writes the WITHDRAWAL_REVERSAL ledger entry, so
+  // reversedAt IS NOT NULL <=> the reversal is fully represented.
   reversedAt      DateTime?
   reversalReason  String?
 
@@ -582,6 +603,7 @@ model Withdrawal {
   @@index([userId, createdAt(sort: Desc)])
   @@index([status])
   @@index([stripePayoutId])
+  @@index([status, payoutClaimedAt])
 }
 
 // ---------------------------------------------------------------------------
