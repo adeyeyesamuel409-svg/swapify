@@ -915,6 +915,338 @@ Resources:
       OKActions:
         - !Ref ReconciliationAlertTopic
 
+  # --- R3.1 dispute anomaly observability -----------------------------------
+  #
+  # READ-ONLY / NON-FINANCIAL. Like the reconciliation block above, this only
+  # derives telemetry from log lines the application already emits. It changes
+  # no application behaviour, no schedule, no task definition, no database and
+  # no Stripe configuration, and it deliberately adds no SNS subscription:
+  # alarms publish to the existing ReconciliationAlertTopic, which has no
+  # subscriber until an operator attaches one (documented in the runbook).
+  #
+  # Why these signals: R2 introduced charge-dispute handling, and every
+  # condition that needs a human is reported as an ANOMALY:/error log line in
+  # apps/api/src/services/disputes.ts, value-gap.ts and stripe.ts. Before this
+  # block those lines existed only in the log stream - a channel nobody watches
+  # - which the R3 audit raised as a release blocker. Each metric filter counts
+  # one class of those lines.
+  #
+  # Both log groups are filtered for every signal. Dispute anomalies surface on
+  # two paths: the API webhook path (charge.dispute.* handling) and the
+  # reconciler path (reconcileDisputes() replay/retry). While
+  # ApiRunsReconciliation=true (deployment step 1 in runbook 4.3) the
+  # reconciliation cycle runs inside the API process too, so the same lines can
+  # land in either group. Filtering both means no path is silently missed.
+  #
+  # Patterns are anchored on the stable ASCII prefix of each message with a
+  # trailing wildcard, because the messages contain a non-ASCII em dash
+  # (U+2014) after the prefix. Each compound pattern stays within the
+  # CloudWatch quota of three wildcard selectors per filter pattern.
+  #
+  # Division of responsibility: DisputeFrozenActionRefused is metric-only. A
+  # frozen-payment refusal means the guard worked - the request was rejected
+  # and no money moved - so it is dashboard material, not a page. Every other
+  # signal means funds may be out of place or state may be stuck, so each gets
+  # its own alarm with TreatMissingData=notBreaching (a quiet period is
+  # healthy). Silence is owned by the existing ReconcilerMissingExecutionAlarm,
+  # not by these.
+
+  DisputeReversalExhaustedApiMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref ApiLogGroup
+      FilterName: DisputeReversalExhaustedApi
+      FilterPattern: '{ $.msg = "ANOMALY: dispute transfer reversals exhausted all attempts*" }'
+      MetricTransformations:
+        - MetricNamespace: !Sub "Swapify/${EnvName}/DisputeAnomalies"
+          MetricName: DisputeReversalExhausted
+          MetricValue: "1"
+          Unit: Count
+
+  DisputeReversalExhaustedReconcilerMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref ReconcilerLogGroup
+      FilterName: DisputeReversalExhaustedReconciler
+      FilterPattern: '{ $.msg = "ANOMALY: dispute transfer reversals exhausted all attempts*" }'
+      MetricTransformations:
+        - MetricNamespace: !Sub "Swapify/${EnvName}/DisputeAnomalies"
+          MetricName: DisputeReversalExhausted
+          MetricValue: "1"
+          Unit: Count
+
+  DisputeReversalExhaustedAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "swapify-${EnvName}-dispute-reversal-exhausted"
+      AlarmDescription: "A dispute transfer reversal reached the bounded retry ceiling and the transferred funds have NOT
+        been clawed back. The ValueGap stays RELEASED with an unchanged internal balance, so an operator
+        must resolve it in the Stripe Dashboard before payouts are considered safe. Source:
+        apps/api/src/services/disputes.ts reconcileDisputes()."
+      Namespace: !Sub "Swapify/${EnvName}/DisputeAnomalies"
+      MetricName: DisputeReversalExhausted
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref ReconciliationAlertTopic
+      OKActions:
+        - !Ref ReconciliationAlertTopic
+
+  DisputeReversalFailedApiMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref ApiLogGroup
+      FilterName: DisputeReversalFailedApi
+      FilterPattern: '{ $.msg = "ANOMALY: DISPUTE_REVERSAL_FAILED*" }'
+      MetricTransformations:
+        - MetricNamespace: !Sub "Swapify/${EnvName}/DisputeAnomalies"
+          MetricName: DisputeReversalFailed
+          MetricValue: "1"
+          Unit: Count
+
+  DisputeReversalFailedReconcilerMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref ReconcilerLogGroup
+      FilterName: DisputeReversalFailedReconciler
+      FilterPattern: '{ $.msg = "ANOMALY: DISPUTE_REVERSAL_FAILED*" }'
+      MetricTransformations:
+        - MetricNamespace: !Sub "Swapify/${EnvName}/DisputeAnomalies"
+          MetricName: DisputeReversalFailed
+          MetricValue: "1"
+          Unit: Count
+
+  DisputeReversalFailedAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "swapify-${EnvName}-dispute-reversal-failed"
+      AlarmDescription: "An attempt to reverse a transfer for a disputed RELEASED ValueGap failed. The attempt is retried
+        by the reconciler while attempts remain under the ceiling; this alarm fires on the first failure
+        so the transfer is never left unwatched. No refund state and no balance entry were written.
+        Source: apps/api/src/services/disputes.ts attemptTransferReversal()."
+      Namespace: !Sub "Swapify/${EnvName}/DisputeAnomalies"
+      MetricName: DisputeReversalFailed
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref ReconciliationAlertTopic
+      OKActions:
+        - !Ref ReconciliationAlertTopic
+
+  DisputeMultipleDisputesApiMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref ApiLogGroup
+      FilterName: DisputeMultipleDisputesApi
+      FilterPattern: '{ $.msg = "ANOMALY: MULTIPLE_DISPUTES*" }'
+      MetricTransformations:
+        - MetricNamespace: !Sub "Swapify/${EnvName}/DisputeAnomalies"
+          MetricName: DisputeMultipleDisputes
+          MetricValue: "1"
+          Unit: Count
+
+  DisputeMultipleDisputesReconcilerMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref ReconcilerLogGroup
+      FilterName: DisputeMultipleDisputesReconciler
+      FilterPattern: '{ $.msg = "ANOMALY: MULTIPLE_DISPUTES*" }'
+      MetricTransformations:
+        - MetricNamespace: !Sub "Swapify/${EnvName}/DisputeAnomalies"
+          MetricName: DisputeMultipleDisputes
+          MetricValue: "1"
+          Unit: Count
+
+  DisputeMultipleDisputesAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "swapify-${EnvName}-dispute-multiple-disputes"
+      AlarmDescription: "A second charge dispute attempted to claim a payment already bound to a different dispute. The
+        claim was refused (stripeDisputeId is unique), so no state was corrupted, but the situation
+        cannot be resolved automatically and needs manual review in Stripe. Source:
+        apps/api/src/services/disputes.ts applyDisputeEvent()."
+      Namespace: !Sub "Swapify/${EnvName}/DisputeAnomalies"
+      MetricName: DisputeMultipleDisputes
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref ReconciliationAlertTopic
+      OKActions:
+        - !Ref ReconciliationAlertTopic
+
+  DisputeClaimLostApiMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref ApiLogGroup
+      FilterName: DisputeClaimLostApi
+      FilterPattern: '{ $.msg = "ANOMALY: dispute claim did not survive*" }'
+      MetricTransformations:
+        - MetricNamespace: !Sub "Swapify/${EnvName}/DisputeAnomalies"
+          MetricName: DisputeClaimLost
+          MetricValue: "1"
+          Unit: Count
+
+  DisputeClaimLostReconcilerMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref ReconcilerLogGroup
+      FilterName: DisputeClaimLostReconciler
+      FilterPattern: '{ $.msg = "ANOMALY: dispute claim did not survive*" }'
+      MetricTransformations:
+        - MetricNamespace: !Sub "Swapify/${EnvName}/DisputeAnomalies"
+          MetricName: DisputeClaimLost
+          MetricValue: "1"
+          Unit: Count
+
+  DisputeClaimLostAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "swapify-${EnvName}-dispute-claim-lost"
+      AlarmDescription: "A dispute claim was written and then did not survive the read-back check. This should be
+        impossible (stripeDisputeId is unique) and indicates a concurrent write or data integrity
+        problem requiring immediate manual review. Source: apps/api/src/services/disputes.ts
+        applyDisputeEvent()."
+      Namespace: !Sub "Swapify/${EnvName}/DisputeAnomalies"
+      MetricName: DisputeClaimLost
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref ReconciliationAlertTopic
+      OKActions:
+        - !Ref ReconciliationAlertTopic
+
+  DisputeReleasedNoExternalPayoutApiMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref ApiLogGroup
+      FilterName: DisputeReleasedNoExternalPayoutApi
+      FilterPattern: '{ $.msg = "ANOMALY: dispute against a RELEASED ValueGap with no externalPayoutRef*" }'
+      MetricTransformations:
+        - MetricNamespace: !Sub "Swapify/${EnvName}/DisputeAnomalies"
+          MetricName: DisputeReleasedNoExternalPayout
+          MetricValue: "1"
+          Unit: Count
+
+  DisputeReleasedNoExternalPayoutReconcilerMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref ReconcilerLogGroup
+      FilterName: DisputeReleasedNoExternalPayoutReconciler
+      FilterPattern: '{ $.msg = "ANOMALY: dispute against a RELEASED ValueGap with no externalPayoutRef*" }'
+      MetricTransformations:
+        - MetricNamespace: !Sub "Swapify/${EnvName}/DisputeAnomalies"
+          MetricName: DisputeReleasedNoExternalPayout
+          MetricValue: "1"
+          Unit: Count
+
+  DisputeReleasedNoExternalPayoutAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "swapify-${EnvName}-dispute-released-no-external-payout"
+      AlarmDescription: "A dispute was claimed against a RELEASED ValueGap that has no recorded Stripe transfer
+        reference, so the system cannot prove or reverse the transfer state. Deliberately not retried:
+        an operator must verify the transfer in the Stripe Dashboard. Source:
+        apps/api/src/services/disputes.ts initiateTransferReversal()."
+      Namespace: !Sub "Swapify/${EnvName}/DisputeAnomalies"
+      MetricName: DisputeReleasedNoExternalPayout
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref ReconciliationAlertTopic
+      OKActions:
+        - !Ref ReconciliationAlertTopic
+
+  DisputeReplayFailureApiMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref ApiLogGroup
+      FilterName: DisputeReplayFailureApi
+      FilterPattern: '{ $.msg = "Failed to replay captured dispute event" || $.msg = "Failed to retry dispute transfer reversal" }'
+      MetricTransformations:
+        - MetricNamespace: !Sub "Swapify/${EnvName}/DisputeAnomalies"
+          MetricName: DisputeReplayFailure
+          MetricValue: "1"
+          Unit: Count
+
+  DisputeReplayFailureReconcilerMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref ReconcilerLogGroup
+      FilterName: DisputeReplayFailureReconciler
+      FilterPattern: '{ $.msg = "Failed to replay captured dispute event" || $.msg = "Failed to retry dispute transfer reversal" }'
+      MetricTransformations:
+        - MetricNamespace: !Sub "Swapify/${EnvName}/DisputeAnomalies"
+          MetricName: DisputeReplayFailure
+          MetricValue: "1"
+          Unit: Count
+
+  DisputeReplayFailureAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "swapify-${EnvName}-dispute-replay-failure"
+      AlarmDescription: "Reconciliation could not replay a durably captured dispute event, or could not retry a pending
+        transfer reversal, and logged the failure. The observation keeps its attempt counter and will be
+        retried until the bounded attempt limit marks it for manual review. Source:
+        apps/api/src/services/disputes.ts reconcileDisputes()."
+      Namespace: !Sub "Swapify/${EnvName}/DisputeAnomalies"
+      MetricName: DisputeReplayFailure
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref ReconciliationAlertTopic
+      OKActions:
+        - !Ref ReconciliationAlertTopic
+
+  DisputeFrozenActionRefusedApiMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref ApiLogGroup
+      FilterName: DisputeFrozenActionRefusedApi
+      FilterPattern: '{ $.msg = "ANOMALY: refusing to release ValueGap*" || $.msg = "ANOMALY: refusing to mark ValueGap REFUNDED*" || $.msg = "ANOMALY: refusing to refund a payment with an open charge dispute*" }'
+      MetricTransformations:
+        - MetricNamespace: !Sub "Swapify/${EnvName}/DisputeAnomalies"
+          MetricName: DisputeFrozenActionRefused
+          MetricValue: "1"
+          Unit: Count
+
+  DisputeFrozenActionRefusedReconcilerMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref ReconcilerLogGroup
+      FilterName: DisputeFrozenActionRefusedReconciler
+      FilterPattern: '{ $.msg = "ANOMALY: refusing to release ValueGap*" || $.msg = "ANOMALY: refusing to mark ValueGap REFUNDED*" || $.msg = "ANOMALY: refusing to refund a payment with an open charge dispute*" }'
+      MetricTransformations:
+        - MetricNamespace: !Sub "Swapify/${EnvName}/DisputeAnomalies"
+          MetricName: DisputeFrozenActionRefused
+          MetricValue: "1"
+          Unit: Count
+
+  # DisputeFrozenActionRefused has NO alarm on purpose: see division of responsibility above.
+
   # --- P1.1 credential rotation resilience ---------------------------------
   #
   # Trigger choice is forced by what actually works in this account, not by

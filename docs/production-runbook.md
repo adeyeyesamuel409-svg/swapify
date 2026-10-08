@@ -61,7 +61,9 @@ The **secret name** is the contract passed as the `*SecretArn` parameters:
 3. Register a **webhook endpoint**:
    - URL: `https://api.swapifyuk.com/stripe/webhook`
    - Events: `checkout.session.completed`, `account.updated`, `payout.paid`,
-     `payout.failed`, `payout.canceled`, `transfer.failed`, `transfer.updated`
+     `payout.failed`, `payout.canceled`, `transfer.failed`,
+     `transfer.updated`, `charge.dispute.created`,
+     `charge.dispute.updated`, `charge.dispute.closed`
    - Copy the **signing secret** (`whsec_...`) into Secrets Manager as
      `swapify/stripe/webhook-secret`.
 4. Enable Stripe Connect payouts for the account.
@@ -260,6 +262,7 @@ remain dependent on the ALB endpoint existing.
 
 - Watch for `ANOMALY:` lines in CloudWatch (missing/duplicate balance credits,
   wrong recipient, RELEASED gap without transfer).
+- Charge-dispute `ANOMALY:` lines are alarmed (see 5.4), not only logged.
 - Watch for `BALANCE_RECONCILIATION_MISMATCH`.
 - Monitor Stripe Dashboard: platform balance, unsettled transfers/payouts.
 - Run `reconcileUserBalance` via the admin endpoint periodically.
@@ -286,8 +289,12 @@ Register a webhook in the Stripe Dashboard (or via `cli listen` for test):
 
 - **Endpoint URL:** `https://api.swapifyuk.com/stripe/webhook`
 - **Signing secret:** paste the `whsec_...` into `swapify/stripe/webhook-secret`.
-- **Events to subscribe** (the handler in `apps/api/src/routes/stripe.ts`
-  processes these; any others are logged as unhandled and are safe no-ops):
+- **Events to subscribe - APPLICATION'S REQUIRED EVENT CONTRACT** (the
+  handler in `apps/api/src/routes/stripe.ts` processes these; any others are
+  logged as unhandled and are safe no-ops). This lists the events the
+  application requires. It does **not** assert that the LIVE Stripe endpoint
+  is currently configured with all of them; verifying the LIVE endpoint's
+  enabled events is a separate read-only task:
   - `checkout.session.completed`
   - `account.updated`
   - `payout.paid`
@@ -295,6 +302,9 @@ Register a webhook in the Stripe Dashboard (or via `cli listen` for test):
   - `payout.canceled`
   - `transfer.failed`
   - `transfer.updated`
+  - `charge.dispute.created`
+  - `charge.dispute.updated`
+  - `charge.dispute.closed`
 
 ### 2.2 Checkout payment
 
@@ -381,9 +391,13 @@ of every rule:
 - **Value-gap reconciliation** (`reconcileValueGaps`) — refunds/releases HELD
   gaps based on authoritative swap/shipment state, and detects anomalies
   (missing/incorrect/duplicate balance credits).
+- **Charge-dispute reconciliation** (`reconcileDisputes`) — replays captured
+  dispute events that could not be applied on arrival, retries outstanding
+  dispute transfer reversals, and surfaces exhausted reversals/open disputes
+  as anomalies (see 6.4).
 
-These are the baseline rules, unchanged. R3.35 moves *when* they run; it does not
-add, remove or alter any of them.
+These are the baseline rules plus the R2 charge-dispute reconciliation; R3.35
+moves *when* they run and does not add, remove or alter any of them.
 
 ### 4.1 Delivery semantics: at-least-once
 
@@ -466,6 +480,8 @@ the scheduled task.
     safety`, `Unhandled Stripe webhook event`.
   - `FATAL: one-shot reconciliation failed` in the reconciler log group — the
     task exited nonzero and the schedule retried it.
+  - `ANOMALY:` dispute lines (see 6.4) are **alarmed**, not just logged —
+    see 5.4.
   - `In-process reconciliation disabled` in the API log group — expected in
     production; its **absence** while `ApiRunsReconciliation=false` means the
     stack is out of sync with the parameter.
@@ -488,6 +504,47 @@ the scheduled task.
   the discrepancy is 0.
 - Monitor the Stripe Dashboard: platform balance vs the sum of internal
   balances, unsettled transfer/payout states, and any charge disputes.
+
+### 5.4 Dispute anomaly alarms
+
+R3.1 derives metrics from the dispute `ANOMALY:` / replay-failure log lines
+that charge-dispute handling already emits (6.4). The filters run on **both**
+`/ecs/swapify/{env}/api` and `/ecs/swapify/{env}/reconciler`, because the same
+lines can be produced by the API's webhook path and by the reconciler's
+replay/retry path (and by in-process sweeping while
+`ApiRunsReconciliation=true`). Namespace: `Swapify/{env}/DisputeAnomalies`.
+
+| Alarm | Fires when |
+| --- | --- |
+| `swapify-{env}-dispute-reversal-exhausted` | reversal retries hit the ceiling; funds not clawed back |
+| `swapify-{env}-dispute-reversal-failed` | a transfer reversal attempt failed (reconciler retries it) |
+| `swapify-{env}-dispute-multiple-disputes` | a second dispute claimed a payment already owned by another |
+| `swapify-{env}-dispute-claim-lost` | a dispute claim did not survive read-back (should be impossible) |
+| `swapify-{env}-dispute-released-no-external-payout` | RELEASED gap disputed with no recorded transfer reference |
+| `swapify-{env}-dispute-replay-failure` | a captured dispute event could not be replayed, or a reversal could not be retried |
+
+All of them: `Sum >= 1` over one 300s period, `TreatMissingData=notBreaching`
+(a quiet window is healthy - silence is covered by the reconciler
+missing-execution alarm in 5.3).
+
+`DisputeFrozenActionRefused` is **metric-only, deliberately not alarmed**: a
+frozen-payment release/refund refusal means the guard worked and no money
+moved. It is dashboard material, not a page.
+
+**Every alarm publishes to `swapify-reconciliation-alerts-{env}`, the existing
+reconciliation SNS topic, which has no subscription** - there is no confirmed
+operator recipient, and none was invented for this phase. Until an operator
+attaches one, these alarms are visible only through the CloudWatch console and
+CLI:
+
+```bash
+aws cloudwatch describe-alarms \
+  --alarm-names "swapify-prod-dispute-reversal-exhausted" \
+  --query 'MetricAlarms[].{name:AlarmName,state:StateValue}'
+```
+
+Attaching a subscription (email/Slack/PagerDuty) is an operator decision and a
+separate change.
 
 ---
 
@@ -523,12 +580,147 @@ refund. Do not bypass the guard programmatically.
 
 ### 6.4 Charge dispute
 
-Charge-dispute handling is **not part of this release** (it ships in a later
-phase, with its own migrations). Until then `charge.dispute.*` is not
-subscribed and not handled: Stripe logs it as an unhandled event. Handle a
-dispute manually and treat it as a financial incident — confirm the charge
-dispute state and any transfer to the recipient in the Stripe Dashboard before
-moving money. Never infer a refund or release from a dispute.
+**This section documents behavior already implemented in source
+(`apps/api/src/routes/stripe.ts`, `apps/api/src/services/disputes.ts`,
+`apps/api/src/services/value-gap.ts`, `apps/api/src/services/stripe.ts`).**
+
+The application processes `charge.dispute.created`, `charge.dispute.updated`
+and `charge.dispute.closed` webhooks. Dispute handling is **not** refund
+handling: `dispute != refund`.
+
+#### Webhook intake (all three event types)
+
+1. **Signature verification.** Every `POST /stripe/webhook` request is verified
+   against the `stripe-signature` header using the raw request body
+   (`request.rawBody`) and the `stripe/webhook-secret` value. A request that
+   fails verification is rejected before any dispute logic runs.
+2. **Durable observation capture.** Before any state transition, the event is
+   recorded durably in `DisputeEventObservation` (keyed by
+   `stripeEventId`) so a crash or a Stripe redelivery can never lose it.
+   Capture is idempotent: a redelivered `stripeEventId` is a no-op.
+3. **Dispute/payment linkage.** The dispute's `paymentIntentId` is resolved to
+   the local `Payment` row; `Payment.stripeDisputeId` is set (unique) to bind
+   exactly one dispute to a payment. A second, different dispute for the same
+   payment is rejected and logged as the `MULTIPLE_DISPUTES` anomaly.
+4. **Duplicate handling.** An event already applied for the same
+   `stripeEventId` returns `DUPLICATE` and performs no additional writes.
+5. **Stale-event handling.** An event whose `eventCreated` predates the
+   payment's recorded `disputeEventAt` is ignored (`OUT_OF_ORDER`) so older
+   events replayed after newer ones cannot roll state backwards.
+6. **Failure propagation.** Any recognized dispute processing failure returns
+   a non-2xx (500) response. Stripe treats non-2xx as a failure and can
+   redeliver; because the event was already durably captured, redelivery and
+   later replay are idempotent.
+
+#### Event-specific behavior
+
+- **`charge.dispute.created`** - the payment is claimed for the dispute
+  (`stripeDisputeId` written) and enters the frozen state. If the linked
+  `ValueGap` is `RELEASED`, a transfer reversal is initiated (see "RELEASED
+  ValueGap dispute handling" below). No refund state is written.
+- **`charge.dispute.updated`** - the dispute status is advanced. When Stripe
+  reports a terminal outcome, the final outcome is latched exactly once
+  (`disputeOutcome`): `WON`/`PREVENTED` unfreeze the payment; `LOST`/`UNKNOWN`
+  keep it frozen for manual review. Non-terminal updates keep the payment
+  frozen.
+- **`charge.dispute.closed`** - the terminal outcome is latched exactly once.
+  `WON`/`PREVENTED` unfreeze the payment (no refund, no release was performed
+  by this handler). `LOST`/`UNKNOWN` leave the payment frozen; the funds are
+  treated as gone and the case requires manual review. The latch is
+  idempotent: a redelivered close event cannot re-latch a different outcome.
+
+#### Frozen payment behavior
+
+While a payment is dispute-frozen (`stripeDisputeId` set and `disputeOutcome`
+not `WON`/`PREVENTED`):
+
+- `releaseValueGap()` refuses to release the gap and credits no balance
+  (`ANOMALY: refusing to release ValueGap — charge dispute is open ...`).
+- `refundValueGap()` refuses to mark the gap `REFUNDED`
+  (`ANOMALY: refusing to mark ValueGap REFUNDED — charge dispute is open ...`).
+- `refundSwapPayment()` refuses to create a Stripe refund
+  (`ANOMALY: refusing to refund a payment with an open charge dispute ...`).
+
+These refusals leave internal financial state untouched. When the dispute
+closes as `WON` or `PREVENTED`, the freeze predicate no longer holds and the
+payment is unfrozen in line with the terminal outcome.
+
+#### `refundedAt` / `stripeRefundId` semantics
+
+`Payment.refundedAt` and `Payment.stripeRefundId` are written **only** by
+`refundSwapPayment()` after a confirmed Stripe Refund object exists (the value
+is always a `re_...` refund id, never a `dp_...` dispute id). They represent a
+**confirmed Stripe Refund only**. Dispute webhook processing never writes them.
+
+**Stripe dispute events do NOT create ordinary Stripe Refunds.**
+
+#### RELEASED ValueGap dispute handling
+
+When a dispute is claimed against a payment whose `ValueGap` is `RELEASED`:
+
+- If `externalPayoutRef` (the Stripe transfer id) exists, a transfer reversal
+  is attempted through the pre-existing, idempotent `reverseTransfer()` path
+  using the deterministic idempotency key `transfer-reversal:{valueGapId}`.
+  Retries are bounded (`MAX_DISPUTE_REVERSAL_ATTEMPTS`, currently 3). An
+  exhausted reversal is logged as `ANOMALY: dispute transfer reversals
+  exhausted all attempts ...` (`DISPUTE_REVERSAL_EXHAUSTED`) and requires
+  manual intervention.
+- If `externalPayoutRef` is missing, no reversal is attempted and the
+  `ANOMALY: dispute against a RELEASED ValueGap with no externalPayoutRef ...`
+  (`DISPUTED_RELEASED_NO_EXTERNAL_PAYOUT`) anomaly is logged for manual review;
+  the transfer state on Stripe is unknown and must be verified by an operator.
+- **No internal balance debit is performed by dispute reversal.** The
+  recipient's internal balance is deliberately left unchanged; clawback is the
+  Stripe transfer reversal's responsibility only.
+
+#### Replay / reconciliation
+
+`reconcileDisputes()` runs inside `expireExpiredSwaps()` in
+`apps/api/src/services/sweeper.ts`, as the **final reconciliation step** of
+each cycle: after swap expiry, `reconcileRefunds()`, `reconcileValueGaps()`
+and `reconcileWithdrawals()`. It:
+
+1. Replays unconsumed `DisputeEventObservation` rows (deferred observations,
+   and events whose application previously failed) by re-applying them through
+   the same idempotent processing path. Replay attempts are bounded
+   (`MAX_DISPUTE_OBSERVATION_ATTEMPTS`, currently 5) so an unmatched charge
+   cannot spin forever. An observation that still cannot be applied logs
+   `Failed to replay captured dispute event` (`DISPUTE_REPLAY_FAILURE`) and
+   requires manual review.
+2. Retries outstanding `PENDING`/`FAILED` transfer reversals under the same
+   idempotency key (a failure logs `Failed to retry dispute transfer reversal`).
+3. Surfaces exhausted reversals and open disputes as one-line `ANOMALY`/WARN
+   logs for operators.
+
+Unconsumed dispute observations are replayed on each cycle until applied or
+until the bounded attempt limit marks them for manual review.
+
+#### Manual-resolution cases
+
+An operator must investigate and resolve these before further disbursement:
+
+- `DISPUTE_REVERSAL_EXHAUSTED` - reversal retry ceiling reached; transfer not
+  clawed back.
+- `MULTIPLE_DISPUTES` - a second dispute attempted to claim a payment already
+  bound to another dispute.
+- `DISPUTED_RELEASED_NO_EXTERNAL_PAYOUT` - a `RELEASED` gap is disputed but has
+  no `externalPayoutRef`, so the external reversal cannot be verified/safely
+  executed.
+- `UNKNOWN`/`LOST` dispute with funds frozen - terminal outcome left the
+  payment frozen with no path back; the funds situation must be assessed in the
+  Stripe Dashboard.
+- `DISPUTE_REPLAY_FAILURE` - a captured dispute observation cannot be applied
+  during reconciliation.
+
+Every trigger above is alarmed by the metric filters in 5.4 (namespace
+`Swapify/{env}/DisputeAnomalies`), which publish to
+`swapify-reconciliation-alerts-{env}`.
+
+**Important:** Stripe dispute events do **not** create ordinary Stripe Refunds.
+Any financial remediation must follow the dispute lifecycle above and only
+create a Stripe Refund via the sanctioned refund path (`refundSwapPayment`)
+after a confirmed Stripe Refund object exists. Never infer a refund or release
+from a dispute event.
 
 ### 6.5 Reconciliation stopped (no recent cycles in the reconciler log group)
 
