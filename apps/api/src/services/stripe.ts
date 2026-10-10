@@ -99,7 +99,7 @@ export async function markPaymentPaid(
   paymentId: string,
   stripeSessionId: string | null,
   stripePaymentIntentId?: string | null,
-): Promise<{ id: string; swapId: string }> {
+): Promise<{ id: string; swapId: string; alreadyProcessed: boolean }> {
   const payment = await prisma.payment.findUnique({
     where: { id: paymentId },
     include: { swap: { include: { offeringUser: { select: { name: true } } } } },
@@ -115,7 +115,7 @@ export async function markPaymentPaid(
         await createSwapShipments(tx, payment.swapId, new Date());
       });
     }
-    return { id: payment.id, swapId: payment.swapId };
+    return { id: payment.id, swapId: payment.swapId, alreadyProcessed: true };
   }
 
   if (stripeSessionId && payment.stripeCheckoutSessionId && payment.stripeCheckoutSessionId !== stripeSessionId) {
@@ -185,7 +185,7 @@ export async function markPaymentPaid(
     await notify(payment.payerUserId, 'SWAP_UPDATE', 'Payment confirmed - your swap is ready', payment.swapId);
   }
 
-  return { id: payment.id, swapId: payment.swapId };
+  return { id: payment.id, swapId: payment.swapId, alreadyProcessed: false };
 }
 
 // Best-effort refund of a swap's gap payment via Stripe. Used when a swap is

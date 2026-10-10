@@ -1,4 +1,5 @@
 import { isLocalStorage } from './services/storage.js';
+import { validateStripeModeConfig } from './services/stripe-mode.js';
 
 // Fail-fast startup validation. Catches production configuration mistakes
 // (missing Stripe keys, incomplete S3 setup) before the server accepts
@@ -56,6 +57,10 @@ export function validateReconcilerConfig(): void {
         'Refusing to run: reconciliation without Stripe can mark value gaps RELEASED in the ledger with no real Stripe transfer behind them.',
     );
   }
+  // R14: the worker must also be able to determine its Stripe mode; in
+  // production an unresolvable mode is fatal (never silently reconcile a
+  // TEST-misconfigured worker against real state).
+  validateStripeModeConfig();
 }
 
 export function validateConfig(): void {
@@ -83,6 +88,11 @@ export function validateConfig(): void {
       );
     }
   }
+
+  // R14: the API must be able to determine its Stripe mode (LIVE vs TEST).
+  // In production an unresolvable/mismatched mode is a startup failure — the
+  // webhook mode gate would otherwise be ambiguous and we never default to LIVE.
+  validateStripeModeConfig();
 
   if (!isLocalStorage()) {
     const missing: string[] = [];

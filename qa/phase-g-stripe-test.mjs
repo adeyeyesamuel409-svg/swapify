@@ -405,6 +405,7 @@ describe('Phase G — Stripe TEST Mode Validation', () => {
         created: Math.floor(Date.now() / 1000),
         api_version: '2023-10-16',
         object: 'event',
+        livemode: false,
         data: {
           object: {
             id: session.id,
@@ -902,6 +903,7 @@ describe('Phase G — Stripe TEST Mode Validation', () => {
         created: Math.floor(Date.now() / 1000),
         api_version: '2023-10-16',
         object: 'event',
+        livemode: false,
         data: {
           object: {
             id: payoutId,
@@ -937,6 +939,7 @@ describe('Phase G — Stripe TEST Mode Validation', () => {
         created: Math.floor(Date.now() / 1000),
         api_version: '2023-10-16',
         object: 'event',
+        livemode: false,
         data: {
           object: { id: payoutId, status: 'paid', arrival_date: Math.floor(Date.now() / 1000) + 86400 },
         },
@@ -1011,6 +1014,7 @@ describe('Phase G — Stripe TEST Mode Validation', () => {
         created: Math.floor(Date.now() / 1000),
         api_version: '2023-10-16',
         object: 'event',
+        livemode: false,
         data: {
           object: { id: payoutId, status: 'failed', amount: amountPence, currency: 'gbp' },
         },
@@ -1053,6 +1057,7 @@ describe('Phase G — Stripe TEST Mode Validation', () => {
         created: Math.floor(Date.now() / 1000),
         api_version: '2023-10-16',
         object: 'event',
+        livemode: false,
         data: {
           object: { id: withdrawal.stripePayoutId, status: 'failed', amount: withdrawal.amountPence, currency: 'gbp' },
         },
@@ -1087,6 +1092,7 @@ describe('Phase G — Stripe TEST Mode Validation', () => {
         created: Math.floor(Date.now() / 1000),
         api_version: '2023-10-16',
         object: 'event',
+        livemode: false,
         data: {
           object: { ...session, payment_status: 'paid' },
         },
@@ -1151,7 +1157,7 @@ describe('Phase G — Stripe TEST Mode Validation', () => {
       assert.equal(pi.status, 'succeeded');
 
       // Simulate webhook
-      const evt = { id: `evt_${crypto.randomBytes(8).toString('hex')}`, type: 'checkout.session.completed', created: Math.floor(Date.now() / 1000), api_version: '2023-10-16', object: 'event', data: { object: { id: `cs_test_${crypto.randomBytes(8).toString('hex')}`, metadata: { paymentId: pay2.id, swapId: swap2.id }, payment_intent: pi.id, payment_status: 'paid' } } };
+      const evt = { id: `evt_${crypto.randomBytes(8).toString('hex')}`, type: 'checkout.session.completed', created: Math.floor(Date.now() / 1000), api_version: '2023-10-16', object: 'event', livemode: false, data: { object: { id: `cs_test_${crypto.randomBytes(8).toString('hex')}`, metadata: { paymentId: pay2.id, swapId: swap2.id }, payment_intent: pi.id, payment_status: 'paid' } } };
       await sendWebhook(evt, signWebhook(evt));
 
       const paidPay = await prisma.payment.findUnique({ where: { id: pay2.id } });
@@ -1232,6 +1238,7 @@ describe('Phase G — Stripe TEST Mode Validation', () => {
         created: Math.floor(Date.now() / 1000),
         api_version: '2023-10-16',
         object: 'event',
+        livemode: false,
         data: {
           object: {
             id: stripeAccountId,

@@ -159,7 +159,7 @@ const main = async () => {
   // Process checkout.session.completed webhook the way Stripe would
   const eventObj = {
     id: `evt_${crypto.randomBytes(8).toString('hex')}`, type: 'checkout.session.completed', created: Math.floor(Date.now() / 1000),
-    api_version: '2023-10-16', object: 'event',
+    api_version: '2023-10-16', object: 'event', livemode: false,
     data: { object: { id: session.id, metadata: session.metadata, payment_status: 'paid', payment_intent: pi.id } },
   };
   const wres = await sendWebhook(eventObj);
@@ -272,7 +272,7 @@ const main = async () => {
     // ---- STEP 13/14: payout lifecycle -> payout.paid ----
     const payoutEvent = {
       id: `evt_${crypto.randomBytes(8).toString('hex')}`, type: 'payout.paid', created: Math.floor(Date.now() / 1000),
-      api_version: '2023-10-16', object: 'event',
+      api_version: '2023-10-16', object: 'event', livemode: false,
       data: { object: { id: payout.id, arrival_date: payout.arrival_date } },
     };
     const pw = await sendWebhook(payoutEvent);
@@ -316,7 +316,7 @@ const main = async () => {
       const reversals = await prisma.balanceEntry.findMany({ where: { userId: seller.id, type: 'WITHDRAWAL_REVERSAL' } });
       const baFail = await prisma.balanceAccount.findUnique({ where: { userId: seller.id } });
       if (fdDb.stripePayoutId) {
-        const failEvent = { id: `evt_${crypto.randomBytes(8).toString('hex')}`, type: 'payout.failed', created: Math.floor(Date.now() / 1000), api_version: '2023-10-16', object: 'event', data: { object: { id: fdDb.stripePayoutId } } };
+        const failEvent = { id: `evt_${crypto.randomBytes(8).toString('hex')}`, type: 'payout.failed', created: Math.floor(Date.now() / 1000), api_version: '2023-10-16', object: 'event', livemode: false, data: { object: { id: fdDb.stripePayoutId } } };
         const fw = await sendWebhook(failEvent);
         const fdFailed = await prisma.withdrawal.findUnique({ where: { id: fdDb.id } });
         const baFail2 = await prisma.balanceAccount.findUnique({ where: { userId: seller.id } });
