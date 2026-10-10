@@ -153,7 +153,9 @@ function ecsSlice(start, end) {
   return stripComments(SRC.ecs.slice(SRC.ecs.indexOf(start), SRC.ecs.indexOf(end)));
 }
 
+const API_TASK_DEF = () => ecsSlice('  ApiTaskDefinition:', '  WebTaskDefinition:');
 const RECONCILER_TASK_DEF = () => ecsSlice('  ReconcilerTaskDefinition:', '  WebService:');
+const API_SERVICE = () => ecsSlice('  ApiService:', '  ReconcilerTaskDefinition:');
 const RECONCILER_SCHEDULE = () => ecsSlice('  ReconcilerSchedule:', '  # --- Load balancer');
 
 // ---------------------------------------------------------------------------
@@ -387,13 +389,23 @@ check('the reconciler task definition runs the one-shot command with the worker 
   assert.match(taskDef, /Type: AWS::ECS::TaskDefinition/);
   assert.match(taskDef, /Command: \["node", "apps\/api\/dist\/reconcile-once\.js"\]/);
   assert.match(taskDef, /- Name: APP_ROLE\n\s+Value: worker/);
-  // Same image as the API: the worker cannot drift from API code.
-  assert.match(taskDef, /Image: !Ref ApiImage/);
+  // R5.5: the worker is pinned to its own ReconcilerImage so an API deployment
+  // can never silently change reconciliation code. It must NOT follow the API
+  // image (this assertion replaces the pre-R5.5 expectation of !Ref ApiImage).
+  assert.match(taskDef, /Image: !Ref ReconcilerImage/);
+  assert.ok(!/Image: !Ref ApiImage/.test(taskDef), 'reconciler must not use the API image');
   // Least privilege secrets: database + Stripe only.
   assert.match(taskDef, /- Name: DATABASE_URL\n\s+ValueFrom: !Ref DatabaseUrlSecretArn/);
   assert.match(taskDef, /- Name: STRIPE_SECRET_KEY\n\s+ValueFrom: !Ref StripeSecretKeySecretArn/);
   assert.ok(!/STRIPE_WEBHOOK_SECRET/.test(taskDef), 'worker must not receive the webhook secret');
   assert.ok(!/S3_BUCKET|CDN_BASE_URL/.test(taskDef), 'worker must not receive storage config');
+});
+
+check('the API task retains the API image and never follows the reconciler image (R5.5)', () => {
+  const apiDef = API_TASK_DEF();
+  assert.ok(apiDef.length > 0, 'ApiTaskDefinition must exist');
+  assert.match(apiDef, /Image: !Ref ApiImage/);
+  assert.ok(!/ReconcilerImage/.test(apiDef), 'API task must not reference the reconciler image');
 });
 
 check('the reconciler container has no port mapping and no health check', () => {
@@ -407,8 +419,17 @@ check('the API task opts out of in-process reconciliation via a parameter', () =
   assert.match(SRC.ecs, /- Name: APP_ROLE\n\s+Value: api/);
   assert.match(SRC.ecs, /- Name: RECONCILE_IN_PROCESS\n\s+Value: !Ref ApiRunsReconciliation/);
   assert.match(SRC.ecs, /ApiRunsReconciliation:\n\s+Type: String\n\s+Default: "false"/);
-  // The service itself is not otherwise altered: same task def, same count.
-  assert.match(SRC.ecs, /TaskDefinition: !Ref ApiTaskDefinition/);
+  // R9: the service is pinned to the reconciled ApiTaskDefinitionArn parameter
+  // so CloudFormation expects exactly the running task revision. The stale
+  // ApiTaskDefinition parameter must not be referenced by the service.
+  const apiSvc = API_SERVICE();
+  assert.ok(apiSvc.length > 0, 'ApiService must exist');
+  assert.match(apiSvc, /^ {6}TaskDefinition: !Ref ApiTaskDefinitionArn$/m);
+  assert.ok(
+    !/TaskDefinition: !Ref ApiTaskDefinition(?!Arn)/.test(apiSvc),
+    'ApiService must not bind the stale ApiTaskDefinition parameter',
+  );
+  // The desired count is unchanged.
   assert.match(SRC.ecs, /DesiredCount: !Ref ApiDesiredCount/);
 });
 

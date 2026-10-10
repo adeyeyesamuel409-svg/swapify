@@ -25,6 +25,12 @@ Parameters:
   ApiImage:
     Type: String
     Description: 'ECR image URI for the API: <account>.dkr.ecr.us-east-1.amazonaws.com/swapify-api:<git-sha> (build with npm run build -w @swapify/api; NODE_ENV=production).'
+  ApiTaskDefinitionArn:
+    Type: String
+    Description: 'Task definition revision the API service must run (R9). Accepts the live out-of-band revision, e.g. arn:aws:ecs:<region>:<account>:task-definition/swapify-api-prod:6, so CloudFormation expects exactly the deployed state and the running revision is preserved.'
+  ReconcilerImage:
+    Type: String
+    Description: 'ECR image URI dedicated to the scheduled reconciler task (R5.5). Kept independent of ApiImage so reconciler code and API code can differ safely.'
   WebImage:
     Type: String
     Description: 'ECR image URI for the web app: <account>.dkr.ecr.us-east-1.amazonaws.com/swapify-web:<git-sha> (build with NEXT_PUBLIC_IMAGE_BASE_URL set to the CDN base URL).'
@@ -407,7 +413,7 @@ Resources:
     Properties:
       Cluster: !Ref Cluster
       ServiceName: !Sub "swapify-api-${EnvName}"
-      TaskDefinition: !Ref ApiTaskDefinition
+      TaskDefinition: !Ref ApiTaskDefinitionArn
       DesiredCount: !Ref ApiDesiredCount
       LaunchType: FARGATE
       HealthCheckGracePeriodSeconds: 60
@@ -442,11 +448,12 @@ Resources:
       TaskRoleArn: !GetAtt ReconcilerTaskRole.Arn
       ContainerDefinitions:
         - Name: reconciler
-          Image: !Ref ApiImage
+          Image: !Ref ReconcilerImage
           Essential: true
           Cpu: 0
-          # Override the image CMD with the one-shot entry point. Same image as
-          # the API, so the worker can never drift from the API's code.
+          # Dedicated ReconcilerImage (R5.5): reconciler code is pinned to the
+          # last verified reconciler build instead of following the API image,
+          # so API deployments can never silently change reconciliation logic.
           Command: ["node", "apps/api/dist/reconcile-once.js"]
           Environment:
             - Name: NODE_ENV
