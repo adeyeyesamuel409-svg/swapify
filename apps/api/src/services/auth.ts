@@ -40,9 +40,9 @@ function requireSecret(): string {
 
 /** `scrypt$N$r$p$salt$hash` */
 export async function hashPassword(plain: string): Promise<string> {
-  const salt = randomBytes(16).toString('hex');
+  const salt = randomBytes(16);
   const derived = await scryptAsync(plain, salt, SCRYPT.keylen, SCRYPT);
-  return `scrypt$${SCRYPT.N}$${SCRYPT.r}$${SCRYPT.p}$${salt}$${derived.toString('hex')}`;
+  return `scrypt$${SCRYPT.N}$${SCRYPT.r}$${SCRYPT.p}$${salt.toString('hex')}$${derived.toString('hex')}`;
 }
 
 export async function verifyPassword(plain: string, stored: string): Promise<boolean> {
