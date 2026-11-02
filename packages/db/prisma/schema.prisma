@@ -33,6 +33,8 @@ model User {
   imageUrl        String?
   // Subject ID from AWS Cognito once authentication is wired up (Sprint 1).
   cognitoSub      String?        @unique
+  // Scrypt-format hash for email+password login (auth migration off Cognito).
+  passwordHash    String?
   items           Item[]
   wishlists       Wishlist[]
   admin           Admin?

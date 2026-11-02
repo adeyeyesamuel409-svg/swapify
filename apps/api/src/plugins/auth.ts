@@ -1,7 +1,9 @@
 import fp from 'fastify-plugin';
 import { FastifyInstance, FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
-import { createRemoteJWKSet, jwtVerify, JWTPayload } from 'jose';
+import { createSecretKey } from 'node:crypto';
+import { jwtVerify, JWTPayload } from 'jose';
 import { prisma, Admin, User } from '@swapify/db';
+import { AUTH_CONSTANTS } from '../services/auth.js';
 
 export interface AuthenticatedUser extends User {
   admin: Admin | null;
@@ -16,47 +18,16 @@ declare module 'fastify' {
   }
 }
 
-const region = process.env.COGNITO_REGION ?? 'us-east-1';
-const userPoolId = process.env.COGNITO_USER_POOL_ID;
-const clientId = process.env.COGNITO_CLIENT_ID;
+// Auth migration (off AWS Cognito): API access tokens are HMAC-SHA256 JWTs
+// signed with the shared AUTH_SECRET and issued by /auth/login or /auth/signup.
+// The `sub` claim carries the local user id.
 
-const issuer = `https://cognito-idp.${region}.amazonaws.com/${userPoolId}`;
-const jwks = createRemoteJWKSet(new URL(`${issuer}/.well-known/jwks.json`));
-
-// A user's first authenticated request creates their local record.
-// Subsequent requests just update the name/email in case they changed in Cognito.
-async function syncUserFromCognito(payload: JWTPayload): Promise<AuthenticatedUser> {
-  const sub = String(payload.sub);
-  const email = typeof payload.email === 'string' ? payload.email : undefined;
-  const name =
-    typeof payload.name === 'string'
-      ? payload.name
-      : typeof payload['cognito:username'] === 'string'
-        ? payload['cognito:username']
-        : 'Swapify User';
-
-  const existing = await prisma.user.findUnique({ where: { cognitoSub: sub } });
-
-  if (existing) {
-    return prisma.user.update({
-      where: { id: existing.id },
-      data: {
-        ...(email && email !== existing.email ? { email } : {}),
-        name,
-      },
-      include: { admin: true },
-    });
+function secretKey() {
+  const secret = process.env.AUTH_SECRET;
+  if (!secret || secret.length < 32) {
+    throw new Error('FATAL: AUTH_SECRET must be set to a value of at least 32 characters.');
   }
-
-  // No local record yet - create user.
-  return prisma.user.create({
-    data: {
-      cognitoSub: sub,
-      email: email ?? `${sub}@cognito.invalid`,
-      name,
-    },
-    include: { admin: true },
-  });
+  return createSecretKey(Buffer.from(secret, 'utf8'));
 }
 
 const authPlugin: FastifyPluginAsync = async (app: FastifyInstance) => {
@@ -67,26 +38,32 @@ const authPlugin: FastifyPluginAsync = async (app: FastifyInstance) => {
       return reply.code(401).send({ error: 'Missing bearer token' });
     }
 
+    let payload: JWTPayload;
     try {
-      const { payload } = await jwtVerify(authHeader.slice('Bearer '.length), jwks, {
-        issuer,
+      const verified = await jwtVerify(authHeader.slice('Bearer '.length), secretKey(), {
+        issuer: AUTH_CONSTANTS.ISSUER,
+        audience: AUTH_CONSTANTS.AUDIENCE,
       });
-
-      // Only access tokens grant API access, never ID tokens.
-      if (payload.token_use !== 'access') {
-        return reply.code(401).send({ error: 'Invalid token type' });
-      }
-
-      // Cognito access tokens carry the app client in `client_id` (no `aud`).
-      if (payload.client_id !== clientId) {
-        return reply.code(401).send({ error: 'Token issued for another client' });
-      }
-
-      request.user = await syncUserFromCognito(payload);
+      payload = verified.payload;
     } catch (err) {
       request.log.warn({ err }, 'JWT verification failed');
       return reply.code(401).send({ error: 'Invalid or expired token' });
     }
+
+    const userId = typeof payload.sub === 'string' ? payload.sub : undefined;
+    if (!userId) {
+      return reply.code(401).send({ error: 'Invalid token' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { admin: true },
+    });
+    if (!user) {
+      return reply.code(401).send({ error: 'Invalid or expired token' });
+    }
+
+    request.user = user;
   });
 };
 
