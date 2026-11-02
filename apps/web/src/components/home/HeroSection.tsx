@@ -75,7 +75,7 @@ export default function HeroSection({ items }: { items: ApiItem[] }) {
         </div>
 
         <div className="relative hidden lg:block">
-          {big ? (
+          {big && (
             <>
               <div className="grid grid-cols-2 gap-4">
                 <HeroPhoto item={big} className="col-span-2 h-64" />
@@ -88,10 +88,6 @@ export default function HeroSection({ items }: { items: ApiItem[] }) {
                 <p className="text-lg font-bold text-token">{formatPence(big.valuePence)}</p>
               </div>
             </>
-          ) : (
-            <div className="flex h-[400px] items-center justify-center rounded-card border border-dashed border-line bg-surface/50 text-muted">
-              Fresh listings appear here
-            </div>
           )}
         </div>
       </div>
