@@ -125,7 +125,7 @@ export class S3StorageProvider implements StorageProvider {
   private client: S3Client;
 
   constructor(opts?: { client?: S3Client }) {
-    this.client = opts?.client ?? new S3Client({ region: process.env.AWS_REGION });
+    this.client = opts?.client ?? new S3Client({ region: process.env.AWS_REGION, ...(process.env.S3_ENDPOINT ? { endpoint: process.env.S3_ENDPOINT, forcePathStyle: true } : {}) });
   }
 
   get bucket(): string {
