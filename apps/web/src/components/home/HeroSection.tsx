@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { MapPin, PackagePlus, ShieldCheck, Sparkles, Star } from "lucide-react";
 import Button from "../Button";
 import SwapMatchMotion from "./SwapMatchMotion";
@@ -76,13 +77,13 @@ export default function HeroSection() {
           <div className="mt-8 flex flex-wrap items-center gap-2 text-xs">
             <span className="text-muted">Popular:</span>
             {["Electronics", "Furniture", "Bikes", "Collectibles"].map((c) => (
-              <a
+              <Link
                 key={c}
                 href={`/browse?q=${encodeURIComponent(c)}`}
                 className="rounded-pill border border-line bg-surface px-3 py-1 font-semibold text-muted transition-colors hover:border-primary/50 hover:text-primary-soft"
               >
                 {c}
-              </a>
+              </Link>
             ))}
           </div>
         </div>
@@ -100,15 +101,8 @@ export default function HeroSection() {
             />
           </div>
 
-          {/* floating chips */}
-          <div className="absolute -left-2 top-6 sm:-left-6">
-            <div className="glass flex items-center gap-2 rounded-pill px-3.5 py-2 shadow-card">
-              <MapPin className="h-3.5 w-3.5 text-primary-soft" aria-hidden />
-              <span className="text-xs font-semibold text-navy">0.8 mi away</span>
-            </div>
-          </div>
-
-          <div className="absolute -right-2 top-24 sm:-right-5">
+          {/* floating chips — balanced corners */}
+          <div className="absolute left-3 top-3 sm:left-5 sm:top-5">
             <div className="glass flex items-center gap-2 rounded-pill px-3.5 py-2 shadow-card">
               <Star className="h-3.5 w-3.5 fill-token-soft text-token-soft" aria-hidden />
               <span className="text-xs font-semibold text-navy">4.9</span>
@@ -116,16 +110,16 @@ export default function HeroSection() {
             </div>
           </div>
 
-          {/* signature swap motion */}
-          <div className="absolute -bottom-8 left-2 sm:-bottom-6 sm:left-6">
-            <SwapMatchMotion />
-          </div>
-
-          <div className="absolute -bottom-4 right-2 hidden sm:right-6 sm:block">
+          <div className="absolute right-3 top-3 sm:right-5 sm:top-5">
             <div className="glass flex items-center gap-2 rounded-pill px-3.5 py-2 shadow-card">
               <ShieldCheck className="h-3.5 w-3.5 text-success" aria-hidden />
               <span className="text-xs font-semibold text-navy">Escrow protected</span>
             </div>
+          </div>
+
+          {/* signature swap motion (carries proximity + top-up context) */}
+          <div className="absolute -bottom-6 left-3 sm:-bottom-8 sm:left-6">
+            <SwapMatchMotion />
           </div>
         </div>
       </div>

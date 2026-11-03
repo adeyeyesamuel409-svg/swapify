@@ -31,7 +31,7 @@ export default function CategoryStrip() {
   return (
     <section id="categories" className="mx-auto max-w-7xl px-4 pt-12 sm:px-6 lg:px-8">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="mr-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary-soft">
+        <span className="w-full text-xs font-semibold uppercase tracking-[0.18em] text-primary-soft sm:w-auto sm:mr-2">
           Browse by category
         </span>
         {CATEGORIES.map((category) => {

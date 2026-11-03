@@ -58,7 +58,7 @@ export default function HowItWorksSection() {
                 </div>
 
                 {i < STEPS.length - 1 && (
-                  <div className="absolute -right-4 top-1/2 hidden -translate-y-1/2 lg:block">
+                  <div className="absolute right-0 top-1/2 z-10 hidden -translate-y-1/2 translate-x-1/2 lg:block">
                     <SwapConnector />
                   </div>
                 )}

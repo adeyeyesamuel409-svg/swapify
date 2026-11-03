@@ -1,6 +1,7 @@
 import type { ApiItem } from "@/lib/api";
 import ItemCard from "../ItemCard";
 import SectionHeader from "../SectionHeader";
+import Button from "../Button";
 import { Stagger, StaggerItem } from "../motion";
 import { MapPin, Store } from "lucide-react";
 
@@ -34,19 +35,13 @@ export default function DiscoveryFeedSection({ items }: { items: ApiItem[] }) {
             arrive. It takes about a minute.
           </p>
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-            <a
-              href="/post"
-              className="inline-flex items-center gap-2 rounded-btn bg-brand px-5 py-2.5 font-semibold text-white shadow-glow transition-all hover:scale-[1.02] hover:brightness-110 active:scale-[0.98]"
-            >
+            <Button href="/post" size="md">
               Post an item
-            </a>
-            <a
-              href="/browse"
-              className="inline-flex items-center gap-2 rounded-btn border border-line-strong bg-surface px-5 py-2.5 font-semibold text-navy transition-colors hover:border-primary/50 hover:text-primary-soft"
-            >
+            </Button>
+            <Button href="/browse" size="md" variant="secondary">
               <MapPin className="h-4 w-4" aria-hidden />
               Browse nearby
-            </a>
+            </Button>
           </div>
         </div>
       )}

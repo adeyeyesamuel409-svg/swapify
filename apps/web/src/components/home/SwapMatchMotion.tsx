@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ArrowLeftRight, Backpack, Camera, Check } from "lucide-react";
+import { ArrowLeftRight, Backpack, Camera, Check, MapPin } from "lucide-react";
 
 const SPRING = { type: "spring", stiffness: 210, damping: 22 } as const;
 
@@ -97,6 +97,13 @@ export default function SwapMatchMotion() {
             + £25.00 cash top-up
           </motion.span>
         </AnimatePresence>
+      </div>
+
+      <div className="mt-2 flex items-center justify-center gap-1 border-t border-line/70 pt-2 text-[10px] text-muted">
+        <MapPin className="h-3 w-3 text-primary-soft" aria-hidden />
+        <span className="font-semibold text-navy">0.8 mi away</span>
+        <span aria-hidden>&middot;</span>
+        <span>handover nearby</span>
       </div>
     </div>
   );
