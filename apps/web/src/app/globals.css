@@ -113,27 +113,36 @@ body {
   overflow-x: clip;
 }
 
-/* Brand gradient: navy -> maroon, used by hero accent + primary CTAs */
-.text-gradient {
-  background: linear-gradient(100deg, #0f172a 0%, #881337 55%, #a61b4d 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+/* Brand: solid maroon depth (no generic gradient) */
+.text-accent {
+  color: var(--primary);
+  background-image: linear-gradient(transparent 62%, rgba(136, 19, 55, 0.16) 62%);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
 }
 
-.dark .text-gradient {
-  background: linear-gradient(100deg, #e2e8f0 0%, #f472a0 55%, #fda4af 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+.dark .text-accent {
+  color: var(--primary-soft);
+  background-image: linear-gradient(transparent 62%, rgba(244, 114, 160, 0.22) 62%);
 }
 
 .bg-brand {
-  background-image: linear-gradient(135deg, #881337 0%, #a61b4d 100%);
+  background-color: #881337;
 }
 
 .dark .bg-brand {
-  background-image: linear-gradient(135deg, #9f1239 0%, #c92c56 100%);
+  background-color: #c92c56;
+}
+
+/* Fine dot-grid texture (marketplace canvas, replaces blur blobs) */
+.bg-dots {
+  background-image: radial-gradient(circle, rgba(15, 23, 42, 0.08) 1px, transparent 1px);
+  background-size: 22px 22px;
+  background-position: 0 0;
+}
+
+.dark .bg-dots {
+  background-image: radial-gradient(circle, rgba(226, 232, 240, 0.1) 1px, transparent 1px);
 }
 
 /* Glassmorphism overlay card */

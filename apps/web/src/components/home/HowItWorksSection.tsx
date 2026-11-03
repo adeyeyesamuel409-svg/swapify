@@ -1,5 +1,7 @@
 import { CreditCard, PackagePlus, Repeat, Search } from "lucide-react";
 import SectionHeader from "../SectionHeader";
+import { FadeUp, Stagger, StaggerItem } from "../motion";
+import SwapConnector from "./SwapConnector";
 
 const STEPS = [
   {
@@ -30,29 +32,39 @@ const STEPS = [
 
 export default function HowItWorksSection() {
   return (
-    <section id="how-it-works" className="border-y border-line bg-surface">
+    <section id="how-it-works" className="bg-dots border-y border-line">
       <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-        <SectionHeader
-          eyebrow="How it works"
-          title="A marketplace built around trading"
-          description="Four simple steps from clutter to treasure. No haggling — just fair, protected swaps."
-        />
-        <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {STEPS.map(({ icon: Icon, step, title, body }) => (
-            <div
-              key={step}
-              className="group rounded-card border border-line bg-surface-2 p-6 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-raise"
-            >
-              <div className="flex items-center justify-between">
-                <span className="flex h-11 w-11 items-center justify-center rounded-btn bg-primary/15 text-primary-soft transition-colors group-hover:bg-brand group-hover:text-white">
-                  <Icon className="h-5 w-5" aria-hidden />
-                </span>
-                <span className="text-sm font-bold text-line-strong">{step}</span>
-              </div>
-              <h3 className="mt-4 font-semibold text-foreground">{title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-muted">{body}</p>
-            </div>
-          ))}
+        <FadeUp>
+          <SectionHeader
+            eyebrow="How it works"
+            title="A marketplace built around trading"
+            description="Four simple steps from clutter to treasure. No haggling — just fair, protected swaps."
+          />
+        </FadeUp>
+
+        <div className="relative mt-10">
+          <Stagger className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {STEPS.map(({ icon: Icon, step, title, body }, i) => (
+              <StaggerItem key={step} className="relative">
+                <div className="group h-full rounded-card border border-line bg-surface p-6 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-raise">
+                  <div className="flex items-center justify-between">
+                    <span className="flex h-11 w-11 items-center justify-center rounded-btn bg-primary/10 text-primary-soft transition-colors group-hover:bg-brand group-hover:text-white">
+                      <Icon className="h-5 w-5" aria-hidden />
+                    </span>
+                    <span className="text-sm font-bold text-line-strong">{step}</span>
+                  </div>
+                  <h3 className="mt-4 font-semibold text-navy">{title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-muted">{body}</p>
+                </div>
+
+                {i < STEPS.length - 1 && (
+                  <div className="absolute -right-4 top-1/2 hidden -translate-y-1/2 lg:block">
+                    <SwapConnector />
+                  </div>
+                )}
+              </StaggerItem>
+            ))}
+          </Stagger>
         </div>
       </div>
     </section>
