@@ -10,6 +10,7 @@ import SwapTimeline from "@/components/SwapTimeline";
 import RatingBox from "@/components/RatingBox";
 import ShippingCard from "@/components/ShippingCard";
 import ItemImage from "@/components/ItemImage";
+import TradeFairnessMeter from "@/components/swap/TradeFairnessMeter";
 import { ArrowRight } from "lucide-react";
 
 export const metadata = { title: "Swap - Swapify" };
@@ -96,6 +97,13 @@ export default async function SwapDetailPage({ params }: { params: Promise<{ id:
             </Link>
             <p className="text-xs text-primary-soft">{formatPence(swap.requestedItem.valuePence)}</p>
           </div>
+        </div>
+
+        <div className="mt-4">
+          <TradeFairnessMeter
+            myValuePence={swap.offeringItem.valuePence}
+            targetValuePence={swap.requestedItem.valuePence}
+          />
         </div>
 
         {gapPence > 0 && (

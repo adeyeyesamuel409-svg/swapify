@@ -17,17 +17,31 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Swapify - Swap what you have for what you need",
+  title: "Swapify - Trade what you have for what you love",
   description:
-    "Swapify is a barter marketplace. Swap the items you no longer use and balance the difference with a secure payment.",
+    "Turn dust-gatherers into instant upgrades with hyper-local direct swapping and smart value balancing.",
 };
+
+const themeBootstrap = `
+(function () {
+  try {
+    var stored = localStorage.getItem("swapify-theme");
+    var dark = stored ? stored === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+    if (dark) document.documentElement.classList.add("dark");
+  } catch (e) {}
+})();
+`;
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeBootstrap }} />
+      </head>
       <body className="min-h-full flex flex-col bg-bg text-foreground">
         <Providers>
           <SiteHeader />

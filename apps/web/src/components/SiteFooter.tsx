@@ -31,7 +31,7 @@ const COLUMNS: { heading: string; links: { label: string; href: string }[] }[] =
 
 export default function SiteFooter() {
   return (
-    <footer className="mt-auto border-t border-line bg-surface">
+    <footer className="mt-auto bg-navy text-slate-200">
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
         <div className="grid gap-10 md:grid-cols-[1.5fr_repeat(3,1fr)]">
           <div>
@@ -39,21 +39,21 @@ export default function SiteFooter() {
               <span className="flex h-8 w-8 items-center justify-center rounded-btn bg-brand text-white">
                 <Repeat className="h-4.5 w-4.5" aria-hidden />
               </span>
-              <span className="text-lg font-bold tracking-tight text-foreground">Swapify</span>
+              <span className="text-lg font-bold tracking-tight text-white">Swapify</span>
             </Link>
-            <p className="mt-3 max-w-xs text-sm text-muted">
-              Swap what you no longer use for what you need. When values don&apos;t match, a secure
-              payment balances the difference.
+            <p className="mt-3 max-w-xs text-sm text-slate-400">
+              Trade what you have for what you love. When values don&apos;t match, a secure
+              cash top-up balances the difference.
             </p>
           </div>
 
           {COLUMNS.map((col) => (
             <div key={col.heading}>
-              <h3 className="text-sm font-semibold text-foreground">{col.heading}</h3>
+              <h3 className="text-sm font-semibold text-white">{col.heading}</h3>
               <ul className="mt-3 space-y-2.5">
                 {col.links.map((l) => (
                   <li key={l.label}>
-                    <Link href={l.href} className="text-sm text-muted transition-colors hover:text-foreground">
+                    <Link href={l.href} className="text-sm text-slate-400 transition-colors hover:text-white">
                       {l.label}
                     </Link>
                   </li>
@@ -63,9 +63,9 @@ export default function SiteFooter() {
           ))}
         </div>
 
-        <div className="mt-10 flex flex-col items-start justify-between gap-3 border-t border-line pt-6 sm:flex-row sm:items-center">
-          <p className="text-xs text-muted">© {new Date().getFullYear()} Swapify. Trade what you own, keep what you love.</p>
-          <p className="text-xs text-muted">Value-gap payments are held until both sides confirm the swap.</p>
+        <div className="mt-10 flex flex-col items-start justify-between gap-3 border-t border-slate-700 pt-6 sm:flex-row sm:items-center">
+          <p className="text-xs text-slate-400">&copy; {new Date().getFullYear()} Swapify. Trade what you own, keep what you love.</p>
+          <p className="text-xs text-slate-400">Value-gap payments are held until both sides confirm the swap.</p>
         </div>
       </div>
     </footer>

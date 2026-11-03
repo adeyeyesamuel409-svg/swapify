@@ -1,9 +1,12 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ---------------------------------------------------------------------------
  * Swapify design tokens (Tailwind v4 theme)
- * Deep near-black foundation with a signature indigo→violet→fuchsia accent
- * used for primary actions. Token values use amber (a "currency" signal).
+ * Light-first: navy structure (#0F172A) + maroon accent (#881337) on off-white
+ * (#F8FAFC). Amber marks the value/currency layer. Dark mode = subtle slate.
+ * Token NAMES match the legacy system so existing utilities re-skin in place.
  * ------------------------------------------------------------------------- */
 @theme inline {
   --color-background: var(--background);
@@ -12,37 +15,95 @@
   --font-mono: var(--font-geist-mono);
 
   /* Surfaces & structure */
-  --color-bg: #0a0a0f;
-  --color-surface: #12121a;
-  --color-surface-2: #181822;
-  --color-surface-3: #1f1f2c;
-  --color-line: #262635;
-  --color-line-strong: #34344a;
-  --color-muted: #9aa0b2;
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-muted: var(--muted);
 
-  /* Brand accent (primary actions) */
-  --color-primary: #7c6ff0;
-  --color-primary-strong: #8b5cf6;
-  --color-primary-soft: #a78bfa;
+  /* Brand: navy structure + maroon accent */
+  --color-primary: var(--primary);
+  --color-primary-strong: var(--primary-strong);
+  --color-primary-soft: var(--primary-soft);
+  --color-navy: var(--navy);
+  --color-navy-soft: var(--navy-soft);
 
-  /* Token economy / currency */
-  --color-token: #fbbf24;
-  --color-token-soft: #f59e0b;
+  /* Token economy / currency + status */
+  --color-token: var(--token);
+  --color-token-soft: var(--token-soft);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
 
-  /* Radius */
-  --radius-card: 0.875rem;
-  --radius-btn: 0.5rem;
+  /* Radius (12-16px family) */
+  --radius-card: 1rem;
+  --radius-btn: 0.75rem;
   --radius-pill: 9999px;
 
   /* Shadows */
-  --shadow-glow: 0 0 0 1px rgba(139, 92, 246, 0.35), 0 8px 30px -8px rgba(139, 92, 246, 0.45);
-  --shadow-card: 0 10px 40px -12px rgba(0, 0, 0, 0.55);
-  --shadow-raise: 0 18px 50px -16px rgba(0, 0, 0, 0.7);
+  --shadow-glow: var(--shadow-glow);
+  --shadow-card: var(--shadow-card);
+  --shadow-raise: var(--shadow-raise);
 }
 
 :root {
-  --background: #0a0a0f;
-  --foreground: #f4f4f8;
+  --background: #f8fafc;
+  --foreground: #0f172a;
+
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --surface-2: #f8fafc;
+  --surface-3: #f1f5f9;
+  --line: #e2e8f0;
+  --line-strong: #cbd5e1;
+  --muted: #64748b;
+
+  --primary: #881337;
+  --primary-strong: #6b0f2b;
+  --primary-soft: #a61b4d;
+  --navy: #0f172a;
+  --navy-soft: #1e293b;
+
+  --token: #b45309;
+  --token-soft: #f59e0b;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #e11d48;
+
+  --shadow-glow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 10px 28px -10px rgba(136, 19, 55, 0.28);
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.05), 0 12px 32px -14px rgba(15, 23, 42, 0.1);
+  --shadow-raise: 0 24px 56px -18px rgba(15, 23, 42, 0.18);
+}
+
+.dark {
+  --background: #0f172a;
+  --foreground: #e2e8f0;
+
+  --bg: #0f172a;
+  --surface: #1e293b;
+  --surface-2: #243244;
+  --surface-3: #2c3b50;
+  --line: #31415a;
+  --line-strong: #40526c;
+  --muted: #94a3b8;
+
+  --primary: #c92c56;
+  --primary-strong: #e11d48;
+  --primary-soft: #f472a0;
+  --navy: #e2e8f0;
+  --navy-soft: #cbd5e1;
+
+  --token: #fbbf24;
+  --token-soft: #f59e0b;
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #fb7185;
+
+  --shadow-glow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 28px -10px rgba(201, 44, 86, 0.35);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.25), 0 12px 32px -14px rgba(0, 0, 0, 0.45);
+  --shadow-raise: 0 24px 56px -18px rgba(0, 0, 0, 0.55);
 }
 
 body {
@@ -52,16 +113,40 @@ body {
   overflow-x: clip;
 }
 
-/* Brand gradient used by hero + primary CTAs */
+/* Brand gradient: navy -> maroon, used by hero accent + primary CTAs */
 .text-gradient {
-  background: linear-gradient(100deg, #a5b4fc 0%, #c4b5fd 45%, #f0abfc 100%);
+  background: linear-gradient(100deg, #0f172a 0%, #881337 55%, #a61b4d 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.dark .text-gradient {
+  background: linear-gradient(100deg, #e2e8f0 0%, #f472a0 55%, #fda4af 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 .bg-brand {
-  background-image: linear-gradient(100deg, #6366f1 0%, #8b5cf6 50%, #d946ef 100%);
+  background-image: linear-gradient(135deg, #881337 0%, #a61b4d 100%);
+}
+
+.dark .bg-brand {
+  background-image: linear-gradient(135deg, #9f1239 0%, #c92c56 100%);
+}
+
+/* Glassmorphism overlay card */
+.glass {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.dark .glass {
+  background: rgba(30, 41, 59, 0.72);
+  border: 1px solid rgba(226, 232, 240, 0.1);
 }
 
 /* Subtle entrance animation for hero content */
@@ -82,6 +167,6 @@ body {
 
 /* Focus rings for keyboard users */
 :focus-visible {
-  outline: 2px solid #a78bfa;
+  outline: 2px solid var(--primary);
   outline-offset: 2px;
 }

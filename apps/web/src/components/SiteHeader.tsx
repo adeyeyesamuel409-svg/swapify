@@ -14,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 import NotificationBell from "./NotificationBell";
+import ThemeToggle from "./ThemeToggle";
 
 const NAV_LINKS = [
   { href: "/browse", label: "Browse" },
@@ -123,7 +124,7 @@ export default function SiteHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-30 border-b border-line/70 bg-bg/80 backdrop-blur-xl">
+    <header className="glass sticky top-0 z-30 border-x-0 border-t-0 border-b border-line/70">
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6 lg:px-8">
         <Link href="/" className="flex shrink-0 items-center gap-2">
           <span className="flex h-8 w-8 items-center justify-center rounded-btn bg-brand text-white shadow-glow">
@@ -147,6 +148,7 @@ export default function SiteHeader() {
         <div className="ml-auto flex items-center gap-2.5">
           <SearchForm className="hidden w-56 xl:block" />
           <div className="hidden items-center gap-2.5 sm:flex">
+            <ThemeToggle />
             <NotificationBell />
             {session?.user ? (
               <UserMenu />
@@ -186,6 +188,7 @@ export default function SiteHeader() {
             ))}
           </nav>
           <div className="mt-3 flex items-center gap-3 border-t border-line pt-3">
+            <ThemeToggle />
             <NotificationBell />
             {session?.user ? (
               <div className="ml-auto">

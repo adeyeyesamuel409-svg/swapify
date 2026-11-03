@@ -13,11 +13,12 @@ import {
   type ApiItem,
 } from "@/lib/api";
 import { CATEGORY_LABELS, CONDITION_LABELS } from "@swapify/shared";
+import { mockProximity } from "@/lib/mock";
 import SwapRequestButton from "@/components/SwapRequestButton";
 import ItemGallery from "@/components/ItemGallery";
 import ItemCard from "@/components/ItemCard";
 import SellerCard from "@/components/SellerCard";
-import { ArrowLeft, Sparkles } from "lucide-react";
+import { ArrowLeft, MapPin, Sparkles } from "lucide-react";
 
 export default async function ItemDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -97,9 +98,17 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
               </span>
             )}
           </div>
-          <h1 className="mt-1 text-3xl font-bold tracking-tight text-foreground">{item.title}</h1>
-          <p className="mt-2 text-sm text-muted">
-            {conditionLabel} &middot; Listed by {item.owner.name} &middot; {timeAgo(item.createdAt)}
+          <h1 className="mt-1 text-3xl font-bold tracking-tight text-navy">{item.title}</h1>
+          <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
+            <span>{conditionLabel}</span>
+            <span aria-hidden>&middot;</span>
+            <span>Listed by {item.owner.name}</span>
+            <span aria-hidden>&middot;</span>
+            <span>{timeAgo(item.createdAt)}</span>
+            <span className="inline-flex items-center gap-1 rounded-pill border border-line bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-foreground">
+              <MapPin className="h-3 w-3 text-primary-soft" aria-hidden />
+              {mockProximity(item.id)}
+            </span>
           </p>
 
           <div className="lg:sticky lg:top-24">
@@ -115,11 +124,13 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
 
             {!isOwnItem &&
               (session?.accessToken ? (
-                <SwapRequestButton itemId={item.id} itemTitle={item.title} itemValuePence={item.valuePence} />
+                <div className="hidden sm:block">
+                  <SwapRequestButton targetItem={item} />
+                </div>
               ) : (
                 <Link
                   href={`/api/auth/signin?callbackUrl=${encodeURIComponent(`/items/${item.id}`)}`}
-                  className="mt-4 flex w-full items-center justify-center rounded-btn bg-brand px-4 py-3 font-semibold text-white shadow-glow transition-all hover:brightness-110"
+                  className="mt-4 hidden w-full items-center justify-center rounded-btn bg-brand px-4 py-3 font-semibold text-white shadow-glow transition-all hover:brightness-110 sm:flex"
                 >
                   Sign in to request this swap
                 </Link>
@@ -127,12 +138,12 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
           </div>
 
           {matchedWishlists.length > 0 && (
-            <div className="mt-4 rounded-card border border-emerald-500/30 bg-emerald-950/40 p-3">
-              <p className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-300">
+            <div className="mt-4 rounded-card border border-emerald-500/30 bg-emerald-50 p-3 dark:bg-emerald-950/40">
+              <p className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
                 <Sparkles className="h-3.5 w-3.5" aria-hidden />
                 Matches your wishlist
               </p>
-              <p className="mt-1 text-xs text-emerald-200/80">
+              <p className="mt-1 text-xs text-emerald-700/80 dark:text-emerald-200/80">
                 {matchedWishlists.map((w) => w.title).join(", ")} — send a swap request to make it yours.
               </p>
             </div>
@@ -153,6 +164,25 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
             ))}
           </div>
         </section>
+      )}
+      {/* sticky mobile action bar */}
+      {!isOwnItem && (
+        <div className="fixed inset-x-0 bottom-0 z-30 flex items-center gap-3 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur sm:hidden">
+          <div className="min-w-0">
+            <p className="text-[11px] text-muted">Value</p>
+            <p className="truncate text-base font-bold text-token">{formatPence(item.valuePence)}</p>
+          </div>
+          {session?.accessToken ? (
+            <SwapRequestButton targetItem={item} className="ml-auto w-auto" />
+          ) : (
+            <Link
+              href={`/api/auth/signin?callbackUrl=${encodeURIComponent(`/items/${item.id}`)}`}
+              className="ml-auto rounded-btn bg-brand px-5 py-2.5 font-semibold text-white shadow-glow"
+            >
+              Sign in to swap
+            </Link>
+          )}
+        </div>
       )}
     </main>
   );
