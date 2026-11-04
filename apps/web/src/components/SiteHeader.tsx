@@ -6,6 +6,7 @@ import { useState } from "react";
 import {
   LogOut,
   Menu,
+  MessageSquare,
   Repeat,
   Search,
   Shield,
@@ -34,6 +35,7 @@ function UserMenu() {
   const links = [
     { href: "/profile", label: "Profile", icon: User },
     { href: "/swaps", label: "My swaps", icon: Repeat },
+    { href: "/messages", label: "Messages", icon: MessageSquare },
     { href: "/wishlists", label: "Wishlists", icon: Wallet },
   ];
 
@@ -149,6 +151,15 @@ export default function SiteHeader() {
           <SearchForm className="hidden w-56 xl:block" />
           <div className="hidden items-center gap-2.5 sm:flex">
             <ThemeToggle />
+            {session?.user && (
+              <Link
+                href="/messages"
+                aria-label="Messages"
+                className="flex h-11 w-11 items-center justify-center rounded-btn border border-line bg-surface-2 text-muted transition-colors hover:border-primary/60 hover:text-foreground"
+              >
+                <MessageSquare className="h-4.5 w-4.5" aria-hidden />
+              </Link>
+            )}
             <NotificationBell />
             {session?.user ? (
               <UserMenu />
@@ -208,4 +219,5 @@ export default function SiteHeader() {
     </header>
   );
 }
+
 

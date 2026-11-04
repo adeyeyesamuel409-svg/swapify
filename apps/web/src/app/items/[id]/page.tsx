@@ -15,6 +15,7 @@ import {
 import { CATEGORY_LABELS, CONDITION_LABELS } from "@swapify/shared";
 import { mockProximity } from "@/lib/mock";
 import SwapRequestButton from "@/components/SwapRequestButton";
+import ItemInquiryButton from "@/components/ItemInquiryButton";
 import MobileActionBar from "@/components/MobileActionBar";
 import ItemGallery from "@/components/ItemGallery";
 import ItemCard from "@/components/ItemCard";
@@ -123,25 +124,27 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
               </p>
             </div>
 
-            {!isOwnItem &&
-              (session?.accessToken ? (
-                <div className="hidden sm:block">
+            {!isOwnItem && (
+              <div className="hidden sm:block">
+                {session?.accessToken ? (
                   <SwapRequestButton targetItem={item} />
-                </div>
-              ) : (
-                <div className="hidden sm:block">
-                  <Link
-                    href={`/api/auth/signin?callbackUrl=${encodeURIComponent(`/items/${item.id}`)}`}
-                    className="mt-4 flex w-full items-center justify-center rounded-btn bg-brand px-4 py-3 font-semibold text-white shadow-glow transition-all hover:brightness-110"
-                  >
-                    Sign in to request this swap
-                  </Link>
-                  <p className="mt-2 inline-flex w-full items-center justify-center gap-1.5 text-xs text-muted">
-                    <ShieldCheck className="h-3.5 w-3.5 text-success" aria-hidden />
-                    Secure &amp; encrypted — your details are never shared
-                  </p>
-                </div>
-              ))}
+                ) : (
+                  <>
+                    <Link
+                      href={`/api/auth/signin?callbackUrl=${encodeURIComponent(`/items/${item.id}`)}`}
+                      className="mt-4 flex w-full items-center justify-center rounded-btn bg-brand px-4 py-3 font-semibold text-white shadow-glow transition-all hover:brightness-110"
+                    >
+                      Sign in to request this swap
+                    </Link>
+                    <p className="mt-2 inline-flex w-full items-center justify-center gap-1.5 text-xs text-muted">
+                      <ShieldCheck className="h-3.5 w-3.5 text-success" aria-hidden />
+                      Secure &amp; encrypted — your details are never shared
+                    </p>
+                  </>
+                )}
+                <ItemInquiryButton targetItem={item} />
+              </div>
+            )}
           </div>
 
           {matchedWishlists.length > 0 && (
@@ -179,6 +182,7 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
             <p className="text-[11px] text-muted">Value</p>
             <p className="truncate text-base font-bold text-token">{formatPence(item.valuePence)}</p>
           </div>
+          <ItemInquiryButton targetItem={item} className="w-auto px-3" />
           {session?.accessToken ? (
             <SwapRequestButton targetItem={item} className="ml-auto w-auto" />
           ) : (

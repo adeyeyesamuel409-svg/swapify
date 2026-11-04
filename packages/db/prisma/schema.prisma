@@ -68,6 +68,8 @@ model User {
   swapsRequested  Swap[]         @relation("RequestedUser")
   paymentsMade    Payment[]      @relation("PayerUser")
   messagesSent    Message[]      @relation("MessageSender")
+  inquiryMessages InquiryMessage[] @relation("InquiryMessageSender")
+  inquiries       ItemInquiry[]  @relation("InquiryBuyer")
   ratingsGiven    Rating[]       @relation("Rater")
   ratingsReceived Rating[]       @relation("Ratee")
   notifications   Notification[]
@@ -155,6 +157,8 @@ model Item {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  inquiries ItemInquiry[]
 
   @@index([ownerId])
   @@index([category, status])
@@ -423,6 +427,37 @@ model Message {
   createdAt DateTime @default(now())
 
   @@index([swapId, createdAt])
+}
+
+// Pre-swap item inquiries: one thread per (item, buyer). Lets buyers ask
+// questions about a listing before proposing a swap.
+model ItemInquiry {
+  id           String            @id @default(cuid())
+  itemId       String
+  item         Item              @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  buyerId      String
+  buyer        User              @relation("InquiryBuyer", fields: [buyerId], references: [id], onDelete: Cascade)
+  buyerReadAt  DateTime?
+  sellerReadAt DateTime?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  messages     InquiryMessage[]
+
+  @@unique([itemId, buyerId])
+  @@index([buyerId])
+  @@index([itemId])
+}
+
+model InquiryMessage {
+  id        String       @id @default(cuid())
+  inquiryId String
+  inquiry   ItemInquiry  @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  senderId  String
+  sender    User         @relation("InquiryMessageSender", fields: [senderId], references: [id])
+  body      String
+  createdAt DateTime     @default(now())
+
+  @@index([inquiryId, createdAt])
 }
 
 model Rating {

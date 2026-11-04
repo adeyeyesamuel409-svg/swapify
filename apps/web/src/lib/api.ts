@@ -298,6 +298,66 @@ export function sendMessage(
   return apiSend(`/swaps/${swapId}/messages`, accessToken, "POST", { body }) as Promise<{ message: ApiMessage }>;
 }
 
+// --- Item inquiries (pre-swap questions) --------------------------------
+
+export type ApiInquiryMessage = {
+  id: string;
+  inquiryId: string;
+  senderId: string;
+  body: string;
+  createdAt: string;
+  sender: { id: string; name: string; imageUrl: string | null };
+};
+
+export type ApiInquiryThread = {
+  id: string;
+  itemId: string;
+  itemTitle: string;
+  itemStatus: string;
+  itemImage: string | null;
+  counterparty: { id: string; name: string | null };
+  buyer: { id: string; name: string; imageUrl: string | null };
+  iAmBuyer: boolean;
+  lastMessage: { body: string; senderId: string; createdAt: string } | null;
+  unread: boolean;
+  updatedAt: string;
+};
+
+export type ApiInquiry = {
+  id: string;
+  itemId: string;
+  buyerId: string;
+  sellerId: string;
+  item: { id: string; title: string; ownerId: string; images: { id: string; url: string }[] };
+};
+
+export function openInquiry(accessToken: string, itemId: string): Promise<{ inquiry: ApiInquiry }> {
+  return apiSend(`/items/${itemId}/inquiries`, accessToken, "POST") as Promise<{ inquiry: ApiInquiry }>;
+}
+
+export function fetchMyInquiries(accessToken: string): Promise<{ inquiries: ApiInquiryThread[] }> {
+  return apiFetch("/users/me/inquiries", accessToken);
+}
+
+export function fetchInquiryMessages(
+  accessToken: string,
+  inquiryId: string,
+): Promise<{ messages: ApiInquiryMessage[] }> {
+  return apiFetch(`/inquiries/${inquiryId}/messages`, accessToken);
+}
+
+export function sendInquiryMessage(
+  accessToken: string,
+  inquiryId: string,
+  body: string,
+): Promise<{ message: ApiInquiryMessage }> {
+  return apiSend(`/inquiries/${inquiryId}/messages`, accessToken, "POST", { body }) as Promise<{
+    message: ApiInquiryMessage;
+  }>;
+}
+
+
+
 // --- Ratings ------------------------------------------------------------
 
 export type ApiRating = {

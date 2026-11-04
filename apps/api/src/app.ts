@@ -1,4 +1,4 @@
-import Fastify, { FastifyError, FastifyInstance } from 'fastify';
+﻿import Fastify, { FastifyError, FastifyInstance } from 'fastify';
 import rawBody from 'fastify-raw-body';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
@@ -11,6 +11,7 @@ import { itemsRoutes } from './routes/items.js';
 import { swapRoutes } from './routes/swaps.js';
 import { stripeRoutes } from './routes/stripe.js';
 import { chatRoutes } from './routes/chat.js';
+import { inquiryRoutes } from './routes/inquiries.js';
 import { ratingRoutes } from './routes/ratings.js';
 import { userRoutes } from './routes/users.js';
 import { wishlistRoutes } from './routes/wishlists.js';
@@ -83,8 +84,8 @@ export async function buildApp(): Promise<FastifyInstance> {
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
   });
 
-  // ── Rate limiting ────────────────────────────────────────────────────────
-  // Global default: 200 requests/min/IP — generous enough for normal browsing
+  // â”€â”€ Rate limiting â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Global default: 200 requests/min/IP â€” generous enough for normal browsing
   // while blocking brute-force and scripted abuse. Sensitive routes get
   // tighter per-route limits applied via route-level config.
   await app.register(rateLimit, {
@@ -93,13 +94,13 @@ export async function buildApp(): Promise<FastifyInstance> {
     addHeadersOnExceeding: { 'x-ratelimit-limit': true, 'x-ratelimit-remaining': true },
     addHeaders: { 'x-ratelimit-limit': true, 'x-ratelimit-remaining': true, 'retry-after': true },
     errorResponseBuilder: (_request, context) => ({
-      error: 'Too many requests — please try again later',
+      error: 'Too many requests â€” please try again later',
       statusCode: 429,
       retryAfter: Math.ceil(context.ttl / 1000),
     }),
   });
 
-  // ── Security headers ─────────────────────────────────────────────────────
+  // â”€â”€ Security headers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Applied via an onRequest hook so they are present on every response
   // without adding a new dependency.
   app.addHook('onRequest', async (_request, reply) => {
@@ -145,6 +146,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   app.register(swapRoutes);
   app.register(stripeRoutes);
   app.register(chatRoutes);
+  app.register(inquiryRoutes);
   app.register(ratingRoutes);
   app.register(userRoutes);
   app.register(uploadRoutes);
@@ -158,3 +160,4 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   return app;
 }
+
