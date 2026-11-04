@@ -3,6 +3,9 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { authOptions } from "@/auth";
 import { fetchMe, fetchUserRatings } from "@/lib/api";
+import { mockVerification } from "@/lib/mock";
+import StarRating from "@/components/StarRating";
+import TrustBadges from "@/components/TrustBadges";
 import MyListings from "@/components/MyListings";
 import AddressBookSection from "@/components/AddressBookSection";
 import BalanceSection from "@/components/BalanceSection";
@@ -39,17 +42,17 @@ export default async function ProfilePage() {
       <div className="rounded-card border border-line bg-surface p-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-lg font-semibold text-foreground">{user.name}</p>
+            <p className="text-lg font-semibold text-navy">{user.name}</p>
             <p className="text-sm text-muted">{user.email}</p>
+            <div className="mt-2">
+              <TrustBadges verified={mockVerification(user.id).verified} idVerified={mockVerification(user.id).idVerified} size="md" />
+            </div>
           </div>
           {ratings && ratings.total > 0 && (
             <div className="text-right">
-              <p className="text-2xl font-bold text-token">
-                {"★".repeat(Math.round(ratings.averageScore ?? 0))}
-                <span className="text-line-strong">{"★".repeat(5 - Math.round(ratings.averageScore ?? 0))}</span>
-              </p>
-              <p className="text-xs text-muted">
-                {ratings.averageScore?.toFixed(1)} · {ratings.total} rating{ratings.total === 1 ? "" : "s"}
+              <StarRating score={ratings.averageScore ?? 0} size="h-4 w-4" />
+              <p className="mt-1 text-xs text-muted">
+                <span className="text-sm font-bold text-token">{ratings.averageScore?.toFixed(1)}</span> · {ratings.total} rating{ratings.total === 1 ? "" : "s"}
               </p>
             </div>
           )}
@@ -79,10 +82,9 @@ export default async function ProfilePage() {
           <div className="mt-3 flex flex-col gap-3">
             {ratings.ratings.slice(0, 5).map((r) => (
               <div key={r.id} className="rounded-btn bg-surface-2 p-3 text-sm">
-                <p className="text-muted">
-                  <span className="font-semibold text-foreground">{r.rater.name}</span>{" "}
-                  {"★".repeat(r.score)}
-                  <span className="text-line-strong">{"★".repeat(5 - r.score)}</span>
+                <p className="flex flex-wrap items-center gap-2 text-muted">
+                  <span className="font-semibold text-foreground">{r.rater.name}</span>
+                  <StarRating score={r.score} />
                 </p>
                 {r.comment && <p className="mt-1 text-muted">&ldquo;{r.comment}&rdquo;</p>}
               </div>

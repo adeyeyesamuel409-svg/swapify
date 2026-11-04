@@ -1,4 +1,7 @@
 import { fetchUserProfile } from "@/lib/api";
+import { mockVerification } from "@/lib/mock";
+import StarRating from "./StarRating";
+import TrustBadges from "./TrustBadges";
 
 type Props = {
   sellerId: string;
@@ -18,6 +21,7 @@ export default async function SellerCard({ sellerId, sellerName, sellerImageUrl 
   const avg = profile?.rating.averageScore ?? null;
   const ratingTotal = profile?.rating.total ?? 0;
   const completedSwaps = profile?.completedSwaps ?? 0;
+  const verification = mockVerification(sellerId);
 
   return (
     <div className="mt-6 rounded-card border border-line bg-surface p-5 shadow-card">
@@ -32,15 +36,18 @@ export default async function SellerCard({ sellerId, sellerName, sellerImageUrl 
           )}
         </div>
         <div className="min-w-0">
-          <p className="truncate font-semibold text-foreground">{sellerName}</p>
-          <p className="text-xs text-muted">
+          <p className="truncate font-semibold text-navy">{sellerName}</p>
+          <div className="mt-1">
+            <TrustBadges verified={verification.verified} idVerified={verification.idVerified} />
+          </div>
+          <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted">
             {avg !== null ? (
               <>
-                <span className="text-token">
-                  {"★".repeat(Math.round(avg))}
-                  <span className="text-line-strong">{"★".repeat(5 - Math.round(avg))}</span>
-                </span>{" "}
-                {avg.toFixed(1)} · {ratingTotal} rating{ratingTotal === 1 ? "" : "s"}
+                <StarRating score={avg} />
+                <span className="font-semibold text-token">{avg.toFixed(1)}</span>
+                <span className="text-muted/70">
+                  · {ratingTotal} rating{ratingTotal === 1 ? "" : "s"}
+                </span>
               </>
             ) : (
               "No ratings yet"
