@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import NotificationBell from "./NotificationBell";
+import SwapIcon from "./SwapIcon";
 import ThemeToggle from "./ThemeToggle";
 
 const NAV_LINKS = [
@@ -129,9 +130,7 @@ export default function SiteHeader() {
     <header className="glass sticky top-0 z-30 border-x-0 border-t-0 border-b border-line/70">
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6 lg:px-8">
         <Link href="/" className="flex shrink-0 items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-btn bg-brand text-white shadow-glow">
-            <Repeat className="h-4.5 w-4.5" aria-hidden />
-          </span>
+          <SwapIcon className="h-9 w-9" />
           <span className="text-lg font-bold tracking-tight text-foreground">Swapify</span>
         </Link>
 

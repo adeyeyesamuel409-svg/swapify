@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Repeat } from "lucide-react";
+import SwapIcon from "./SwapIcon";
 
 const COLUMNS: { heading: string; links: { label: string; href: string }[] }[] = [
   {
@@ -36,9 +36,7 @@ export default function SiteFooter() {
         <div className="grid gap-10 md:grid-cols-[1.5fr_repeat(3,1fr)]">
           <div>
             <Link href="/" className="flex items-center gap-2">
-              <span className="flex h-8 w-8 items-center justify-center rounded-btn bg-brand text-white">
-                <Repeat className="h-4.5 w-4.5" aria-hidden />
-              </span>
+              <SwapIcon className="h-9 w-9" />
               <span className="text-lg font-bold tracking-tight text-white">Swapify</span>
             </Link>
             <p className="mt-3 max-w-xs text-sm text-slate-400">
