@@ -31,8 +31,9 @@ export async function sendEmail(opts: {
 }): Promise<void> {
   const key = apiKey();
   if (!key) {
-    // Local development without a key: log and continue.
-    console.warn(`[email] RESEND_API_KEY not set - skipping email to ${opts.to}: ${opts.subject}`);
+    // Local development without a key: log (including the code-bearing text so
+    // the verification flow is testable end-to-end) and continue.
+    console.warn(`[email] RESEND_API_KEY not set - skipping email to ${opts.to}: ${opts.subject} :: ${opts.text ?? ''}`);
     return;
   }
   const res = await fetch(RESEND_API_URL, {
