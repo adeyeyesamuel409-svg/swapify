@@ -68,6 +68,9 @@ export function validateConfig(): void {
     const missing: string[] = [];
     if (!process.env.STRIPE_SECRET_KEY) missing.push('STRIPE_SECRET_KEY');
     if (!process.env.STRIPE_WEBHOOK_SECRET) missing.push('STRIPE_WEBHOOK_SECRET');
+    if (!process.env.RESEND_API_KEY) {
+      missing.push('RESEND_API_KEY (email verification cannot send codes without it)');
+    }
     if (!process.env.WEB_BASE_URL || process.env.WEB_BASE_URL.includes('localhost')) {
       missing.push('WEB_BASE_URL (must be set to a real URL in production)');
     }

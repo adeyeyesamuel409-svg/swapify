@@ -20,10 +20,9 @@ const ENTRY_TYPE_LABELS: Record<string, string> = {
 
 type Props = {
   accessToken: string;
-  onNavigateToWithdraw?: () => void;
 };
 
-export default function BalanceSection({ accessToken, onNavigateToWithdraw }: Props) {
+export default function BalanceSection({ accessToken }: Props) {
   const [balance, setBalance] = useState<ApiBalance | null>(null);
   const [entries, setEntries] = useState<ApiBalanceEntry[]>([]);
   const [connectAccount, setConnectAccount] = useState<ApiConnectAccount | null>(null);
@@ -146,9 +145,11 @@ export default function BalanceSection({ accessToken, onNavigateToWithdraw }: Pr
         </div>
       </div>
 
-      {canWithdraw && onNavigateToWithdraw && (
+      {canWithdraw && (
         <button
-          onClick={onNavigateToWithdraw}
+          onClick={() => {
+            document.getElementById("withdrawal-form")?.scrollIntoView({ behavior: "smooth" });
+          }}
           className="mt-4 w-full rounded-btn bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-glow transition-all hover:brightness-110 hover:shadow-raise active:scale-[0.98]"
         >
           Withdraw

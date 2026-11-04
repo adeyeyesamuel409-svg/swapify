@@ -60,12 +60,7 @@ export default async function ProfilePage() {
       <MyListings accessToken={session.accessToken} />
 
       <div id="balance-section">
-        <BalanceSection
-          accessToken={session.accessToken}
-          onNavigateToWithdraw={() => {
-            document.getElementById('withdrawal-form')?.scrollIntoView({ behavior: 'smooth' });
-          }}
-        />
+        <BalanceSection accessToken={session.accessToken} />
       </div>
 
       <PayoutSetupSection accessToken={session.accessToken} />

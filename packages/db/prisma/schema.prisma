@@ -25,6 +25,29 @@ enum AdminRole {
   SUPPORT
 }
 
+enum EmailCodePurpose {
+  EMAIL_VERIFY
+  PASSWORD_RESET
+}
+
+// One-time emailed codes (6-digit) for email verification and password reset.
+// Only a SHA-256 hash of the code is stored; codes expire and are single-use.
+model EmailCode {
+  id         String          @id @default(cuid())
+  userId     String
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email      String
+  purpose    EmailCodePurpose
+  codeHash   String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  attempts   Int             @default(0)
+  createdAt  DateTime        @default(now())
+
+  @@index([email, purpose, createdAt])
+  @@index([userId, purpose])
+}
+
 model User {
   id              String         @id @default(cuid())
   email           String         @unique
@@ -35,6 +58,9 @@ model User {
   cognitoSub      String?        @unique
   // Scrypt-format hash for email+password login (auth migration off Cognito).
   passwordHash    String?
+  // Set once the email verification code has been accepted. NULL blocks login.
+  emailVerified   DateTime?
+  emailCodes      EmailCode[]
   items           Item[]
   wishlists       Wishlist[]
   admin           Admin?

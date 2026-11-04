@@ -152,13 +152,18 @@ export class S3StorageProvider implements StorageProvider {
     const filename = `${randomUUID()}${detected.ext}`;
     const key = objectKeyFor(filename);
 
+    // S3-compatible endpoints (e.g. DO Spaces) are used with a custom endpoint;
+    // they do not all accept the AWS SSE header or default to public objects.
+    // Only request SSE on real AWS, and always publish images so the CDN URLs
+    // returned to clients resolve without signed requests.
     await this.client.send(
       new PutObjectCommand({
         Bucket: this.bucket,
         Key: key,
         Body: buffer,
         ContentType: detected.mime,
-        ServerSideEncryption: 'AES256',
+        ACL: 'public-read',
+        ...(process.env.S3_ENDPOINT ? {} : { ServerSideEncryption: 'AES256' }),
       }),
     );
 

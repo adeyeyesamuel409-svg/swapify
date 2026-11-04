@@ -4,9 +4,9 @@
 // with the shared AUTH_SECRET. The web app calls /auth/login or /auth/signup and
 // forwards the returned token as `Authorization: Bearer <token>`.
 
-import { randomBytes, scrypt as scryptCb, timingSafeEqual, createSecretKey } from 'node:crypto';
+import { randomBytes, randomInt, scrypt as scryptCb, timingSafeEqual, createSecretKey, createHash } from 'node:crypto';
 import { SignJWT } from 'jose';
-import type { User } from '@swapify/db';
+import { prisma, type User } from '@swapify/db';
 
 type ScryptInput = string | Buffer;
 
@@ -81,3 +81,90 @@ export function signAccessToken(user: Pick<User, 'id' | 'email' | 'name'>): Prom
 }
 
 export const AUTH_CONSTANTS = { ISSUER, AUDIENCE } as const;
+
+// ---------------------------------------------------------------------------
+// Emailed one-time codes (email verification + password reset).
+// Codes are 6 digits, stored as SHA-256 hashes, expire after 15 minutes, allow
+// 5 attempts, and are single-use. Re-issuing invalidates prior live codes and
+// is throttled to one send per minute per (user, purpose).
+// ---------------------------------------------------------------------------
+
+const CODE_TTL_MS = 15 * 60 * 1000;
+const CODE_MAX_ATTEMPTS = 5;
+const CODE_RESEND_COOLDOWN_MS = 60 * 1000;
+
+export type EmailCodePurpose = 'EMAIL_VERIFY' | 'PASSWORD_RESET';
+
+export function generateEmailCode(): string {
+  return String(randomInt(100000, 1000000));
+}
+
+function hashCode(code: string): string {
+  return createHash('sha256').update(code).digest('hex');
+}
+
+/** Issues a fresh code; returns the plaintext code (to email) or null when throttled. */
+export async function issueEmailCode(
+  userId: string,
+  email: string,
+  purpose: EmailCodePurpose,
+): Promise<{ code: string } | { code: null }> {
+  const latest = await prisma.emailCode.findFirst({
+    where: { userId, purpose },
+    orderBy: { createdAt: 'desc' },
+  });
+  if (latest && Date.now() - latest.createdAt.getTime() < CODE_RESEND_COOLDOWN_MS) {
+    return { code: null };
+  }
+  await prisma.emailCode.updateMany({
+    where: { userId, purpose, consumedAt: null },
+    data: { consumedAt: new Date() },
+  });
+  const code = generateEmailCode();
+  await prisma.emailCode.create({
+    data: {
+      userId,
+      email,
+      purpose,
+      codeHash: hashCode(code),
+      expiresAt: new Date(Date.now() + CODE_TTL_MS),
+    },
+  });
+  return { code };
+}
+
+export type ConsumeCodeResult = 'ok' | 'invalid' | 'expired' | 'attempts_exceeded';
+
+/** Verifies and consumes the newest unconsumed code for (email, purpose). */
+export async function consumeEmailCode(
+  email: string,
+  purpose: EmailCodePurpose,
+  code: string,
+): Promise<ConsumeCodeResult> {
+  const normalized = code.trim();
+  const record = await prisma.emailCode.findFirst({
+    where: { email, purpose, consumedAt: null },
+    orderBy: { createdAt: 'desc' },
+  });
+  if (!record) return 'invalid';
+  if (record.attempts >= CODE_MAX_ATTEMPTS) return 'attempts_exceeded';
+  if (record.expiresAt.getTime() < Date.now()) return 'expired';
+
+  const expected = Buffer.from(record.codeHash, 'hex');
+  const actual = Buffer.from(hashCode(normalized), 'hex');
+  const matches = expected.length === actual.length && timingSafeEqual(expected, actual);
+
+  if (!matches) {
+    await prisma.emailCode.update({
+      where: { id: record.id },
+      data: { attempts: { increment: 1 } },
+    });
+    return 'invalid';
+  }
+
+  await prisma.emailCode.update({
+    where: { id: record.id },
+    data: { consumedAt: new Date() },
+  });
+  return 'ok';
+}

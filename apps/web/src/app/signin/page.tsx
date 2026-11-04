@@ -1,54 +1,85 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Repeat, ArrowRight, ShieldCheck, Lock, KeyRound } from "lucide-react";
+import { Repeat, ArrowRight, ShieldCheck, Lock, KeyRound, MailCheck } from "lucide-react";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 8;
+const RESEND_COOLDOWN_SECONDS = 60;
 
-// The API base for the browser (signup). Server-side sign-in goes through
-// NextAuth's authorize() which uses API_URL at runtime.
+// The API base for the browser (signup/verification). Server-side sign-in goes
+// through NextAuth's authorize() which uses API_URL at runtime.
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+
+type Mode = "signin" | "signup" | "verify" | "forgot" | "reset";
 
 function SignInForm() {
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/";
-  const error = searchParams.get("error");
 
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [validationError, setValidationError] = useState("");
+  const [info, setInfo] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [resendIn, setResendIn] = useState(0);
+
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const id = setTimeout(() => setResendIn((s) => s - 1), 1000);
+    return () => clearTimeout(id);
+  }, [resendIn]);
+
+  const startCooldown = () => setResendIn(RESEND_COOLDOWN_SECONDS);
+
+  const doSignIn = async () => {
+    const result = await signIn("credentials", {
+      email: email.trim(),
+      password,
+      callbackUrl,
+      redirect: false,
+    });
+    if (result?.error) {
+      setValidationError("We couldn't sign you in. Please try again.");
+      setSubmitting(false);
+      return;
+    }
+    window.location.assign(result?.url ?? callbackUrl);
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedEmail = email.trim();
     const trimmedName = name.trim();
 
+    setValidationError("");
+    setInfo("");
+
     if (!EMAIL_RE.test(trimmedEmail)) {
       setValidationError("Enter a valid email address.");
       return;
     }
-    if (password.length < MIN_PASSWORD_LENGTH) {
-      setValidationError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
-      return;
-    }
-    if (mode === "signup" && !trimmedName) {
-      setValidationError("Enter your name.");
-      return;
-    }
 
-    setValidationError("");
     setSubmitting(true);
-
     try {
       if (mode === "signup") {
-        // Create the account first, then establish the session via sign-in.
+        if (password.length < MIN_PASSWORD_LENGTH) {
+          setValidationError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
+          setSubmitting(false);
+          return;
+        }
+        if (!trimmedName) {
+          setValidationError("Enter your name.");
+          setSubmitting(false);
+          return;
+        }
         const res = await fetch(`${API_BASE}/auth/signup`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -60,30 +91,135 @@ function SignInForm() {
           setSubmitting(false);
           return;
         }
-      }
-
-      const result = await signIn("credentials", {
-        email: trimmedEmail,
-        password,
-        callbackUrl,
-        redirect: false,
-      });
-
-      if (result?.error) {
-        setValidationError(
-          mode === "signin"
-            ? "Incorrect email or password."
-            : "We couldn't sign you in automatically. Try signing in.",
-        );
+        setCode("");
+        setMode("verify");
+        setInfo(`We sent a 6-digit code to ${trimmedEmail}.`);
+        startCooldown();
         setSubmitting(false);
         return;
       }
 
-      window.location.assign(result?.url ?? callbackUrl);
+      if (mode === "verify") {
+        if (code.trim().length !== 6) {
+          setValidationError("Enter the 6-digit code from your email.");
+          setSubmitting(false);
+          return;
+        }
+        const res = await fetch(`${API_BASE}/auth/verify-email`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: trimmedEmail, code: code.trim() }),
+        });
+        if (!res.ok) {
+          const data = (await res.json().catch(() => null)) as { error?: string } | null;
+          setValidationError(data?.error ?? "Verification failed. Please try again.");
+          setSubmitting(false);
+          return;
+        }
+        await doSignIn();
+        return;
+      }
+
+      if (mode === "forgot") {
+        await fetch(`${API_BASE}/auth/forgot-password`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: trimmedEmail }),
+        });
+        setCode("");
+        setMode("reset");
+        setInfo(`If an account exists for ${trimmedEmail}, a reset code is on its way.`);
+        startCooldown();
+        setSubmitting(false);
+        return;
+      }
+
+      if (mode === "reset") {
+        if (code.trim().length !== 6) {
+          setValidationError("Enter the 6-digit code from your email.");
+          setSubmitting(false);
+          return;
+        }
+        if (newPassword.length < MIN_PASSWORD_LENGTH) {
+          setValidationError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
+          setSubmitting(false);
+          return;
+        }
+        const res = await fetch(`${API_BASE}/auth/reset-password`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: trimmedEmail, code: code.trim(), newPassword }),
+        });
+        if (!res.ok) {
+          const data = (await res.json().catch(() => null)) as { error?: string } | null;
+          setValidationError(data?.error ?? "Reset failed. Please try again.");
+          setSubmitting(false);
+          return;
+        }
+        setPassword("");
+        setNewPassword("");
+        setCode("");
+        setMode("signin");
+        setInfo("Password updated — sign in with your new password.");
+        setSubmitting(false);
+        return;
+      }
+
+      // signin: probe the API first so unverified accounts get the code screen.
+      const probe = await fetch(`${API_BASE}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: trimmedEmail, password }),
+      });
+      if (!probe.ok) {
+        const data = (await probe.json().catch(() => null)) as { error?: string } | null;
+        if (data?.error === "EMAIL_NOT_VERIFIED") {
+          setMode("verify");
+          setInfo(`Verify your email to continue — we sent a code to ${trimmedEmail}.`);
+          startCooldown();
+          setSubmitting(false);
+          return;
+        }
+        setValidationError("Incorrect email or password.");
+        setSubmitting(false);
+        return;
+      }
+      await doSignIn();
     } catch {
       setValidationError("Something went wrong. Please try again.");
       setSubmitting(false);
     }
+  };
+
+  const resend = async () => {
+    if (resendIn > 0) return;
+    setValidationError("");
+    try {
+      await fetch(`${API_BASE}/auth/resend-verification`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      setInfo(`A new code is on its way to ${email.trim()}.`);
+      startCooldown();
+    } catch {
+      setValidationError("Couldn't resend the code. Please try again.");
+    }
+  };
+
+  const titles: Record<Mode, string> = {
+    signin: "Welcome back to Swapify",
+    signup: "Join Swapify",
+    verify: "Verify your email",
+    forgot: "Reset your password",
+    reset: "Choose a new password",
+  };
+  const subtitles: Record<Mode, string> = {
+    signin: "Sign in to offer swaps, chat, and balance value gaps.",
+    signup: "Create an account to list items and start swapping.",
+    verify: "Enter the 6-digit code we emailed you to activate your account.",
+    forgot: "We'll email you a 6-digit code to reset your password.",
+    reset: "Enter the code and choose a new password.",
   };
 
   return (
@@ -92,108 +228,186 @@ function SignInForm() {
         <div className="rounded-card border border-line bg-surface p-6 shadow-card sm:p-8">
           <div className="flex flex-col items-center text-center">
             <span className="flex h-12 w-12 items-center justify-center rounded-btn bg-brand text-white shadow-glow">
-              <Repeat className="h-6 w-6" aria-hidden />
+              {mode === "verify" || mode === "reset" ? (
+                <MailCheck className="h-6 w-6" aria-hidden />
+              ) : (
+                <Repeat className="h-6 w-6" aria-hidden />
+              )}
             </span>
-            <h1 className="mt-4 text-2xl font-bold tracking-tight text-foreground">
-              {mode === "signin" ? "Welcome back to Swapify" : "Join Swapify"}
-            </h1>
-            <p className="mt-1 text-sm text-muted">
-              {mode === "signin"
-                ? "Sign in to offer swaps, chat, and balance value gaps."
-                : "Create an account to list items and start swapping."}
+            <h1 className="mt-4 text-2xl font-bold tracking-tight text-navy">{titles[mode]}</h1>
+            <p className="mt-1 text-sm text-muted">{subtitles[mode]}</p>
+          </div>
+
+          {(mode === "signin" || mode === "signup") && (
+            <div className="mt-6 grid grid-cols-2 rounded-btn border border-line bg-surface-2 p-1 text-sm font-medium" role="tablist">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={mode === "signin"}
+                onClick={() => { setMode("signin"); setValidationError(""); setInfo(""); }}
+                className={`rounded-md px-3 py-1.5 transition-colors ${mode === "signin" ? "bg-surface text-navy shadow-card" : "text-muted hover:text-foreground"}`}
+              >
+                Sign in
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={mode === "signup"}
+                onClick={() => { setMode("signup"); setValidationError(""); setInfo(""); }}
+                className={`rounded-md px-3 py-1.5 transition-colors ${mode === "signup" ? "bg-surface text-navy shadow-card" : "text-muted hover:text-foreground"}`}
+              >
+                Create account
+              </button>
+            </div>
+          )}
+
+          {validationError && (
+            <p className="mt-4 rounded-btn border border-rose-500/40 bg-rose-50 p-3 text-sm text-rose-700 dark:bg-rose-950 dark:text-rose-200">
+              {validationError}
             </p>
-          </div>
-
-          <div className="mt-6 grid grid-cols-2 rounded-btn border border-line bg-surface-2 p-1 text-sm font-medium" role="tablist">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={mode === "signin"}
-              onClick={() => { setMode("signin"); setValidationError(""); }}
-              className={`rounded-md px-3 py-1.5 transition-colors ${mode === "signin" ? "bg-surface-3 text-foreground shadow-card" : "text-muted hover:text-foreground"}`}
-            >
-              Sign in
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={mode === "signup"}
-              onClick={() => { setMode("signup"); setValidationError(""); }}
-              className={`rounded-md px-3 py-1.5 transition-colors ${mode === "signup" ? "bg-surface-3 text-foreground shadow-card" : "text-muted hover:text-foreground"}`}
-            >
-              Create account
-            </button>
-          </div>
-
-          {(error || validationError) && (
-            <p className="mt-4 rounded-btn border border-rose-500/40 bg-rose-950 p-3 text-sm text-rose-200">
-              {validationError || "Sign-in didn't complete. Please try again."}
+          )}
+          {info && (
+            <p className="mt-4 rounded-btn border border-emerald-500/40 bg-emerald-50 p-3 text-sm text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200">
+              {info}
             </p>
           )}
 
           <form onSubmit={submit} className="mt-5 flex flex-col gap-3" noValidate>
-            <div>
-              <label htmlFor="email" className="text-xs font-semibold text-muted">
-                Email address
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  setValidationError("");
-                }}
-                placeholder="you@example.com"
-                className="mt-1.5 h-11 w-full rounded-btn border border-line bg-surface-2 px-3 text-sm text-foreground placeholder:text-muted focus:border-primary/60 focus:outline-none"
-              />
-            </div>
-
-            {mode === "signup" && (
+            {(mode === "verify" || mode === "forgot" || mode === "reset") && (
               <div>
-                <label htmlFor="name" className="text-xs font-semibold text-muted">
-                  Your name
+                <label htmlFor="email" className="text-xs font-semibold text-muted">
+                  Email address
                 </label>
                 <input
-                  id="name"
-                  name="name"
-                  type="text"
-                  autoComplete="name"
+                  id="email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
                   required
-                  value={name}
-                  onChange={(e) => {
-                    setName(e.target.value);
-                    setValidationError("");
-                  }}
-                  placeholder="Alex Smith"
+                  value={email}
+                  onChange={(e) => { setEmail(e.target.value); setValidationError(""); }}
+                  placeholder="you@example.com"
                   className="mt-1.5 h-11 w-full rounded-btn border border-line bg-surface-2 px-3 text-sm text-foreground placeholder:text-muted focus:border-primary/60 focus:outline-none"
                 />
               </div>
             )}
 
-            <div>
-              <label htmlFor="password" className="text-xs font-semibold text-muted">
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete={mode === "signin" ? "current-password" : "new-password"}
-                required
-                minLength={MIN_PASSWORD_LENGTH}
-                value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  setValidationError("");
-                }}
-                placeholder={mode === "signin" ? "Your password" : "At least 8 characters"}
-                className="mt-1.5 h-11 w-full rounded-btn border border-line bg-surface-2 px-3 text-sm text-foreground placeholder:text-muted focus:border-primary/60 focus:outline-none"
-              />
-            </div>
+            {(mode === "verify" || mode === "reset") && (
+              <div>
+                <label htmlFor="code" className="text-xs font-semibold text-muted">
+                  6-digit code
+                </label>
+                <input
+                  id="code"
+                  name="code"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  required
+                  value={code}
+                  onChange={(e) => { setCode(e.target.value.replace(/\D/g, "")); setValidationError(""); }}
+                  placeholder="123456"
+                  className="mt-1.5 h-11 w-full rounded-btn border border-line bg-surface-2 px-3 text-center text-lg font-semibold tracking-[0.4em] text-foreground placeholder:tracking-normal placeholder:font-normal placeholder:text-muted focus:border-primary/60 focus:outline-none"
+                />
+                {mode === "verify" && (
+                  <button
+                    type="button"
+                    onClick={resend}
+                    disabled={resendIn > 0}
+                    className="mt-2 text-xs font-semibold text-primary-soft underline disabled:text-muted disabled:no-underline"
+                  >
+                    {resendIn > 0 ? `Resend code in ${resendIn}s` : "Resend code"}
+                  </button>
+                )}
+              </div>
+            )}
+
+            {(mode === "signin" || mode === "signup") && (
+              <>
+                {mode === "signup" && (
+                  <div>
+                    <label htmlFor="name" className="text-xs font-semibold text-muted">
+                      Your name
+                    </label>
+                    <input
+                      id="name"
+                      name="name"
+                      type="text"
+                      autoComplete="name"
+                      required
+                      value={name}
+                      onChange={(e) => { setName(e.target.value); setValidationError(""); }}
+                      placeholder="Alex Smith"
+                      className="mt-1.5 h-11 w-full rounded-btn border border-line bg-surface-2 px-3 text-sm text-foreground placeholder:text-muted focus:border-primary/60 focus:outline-none"
+                    />
+                  </div>
+                )}
+                <div>
+                  <label htmlFor="email" className="text-xs font-semibold text-muted">
+                    Email address
+                  </label>
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    value={email}
+                    onChange={(e) => { setEmail(e.target.value); setValidationError(""); }}
+                    placeholder="you@example.com"
+                    className="mt-1.5 h-11 w-full rounded-btn border border-line bg-surface-2 px-3 text-sm text-foreground placeholder:text-muted focus:border-primary/60 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="password" className="text-xs font-semibold text-muted">
+                    Password
+                  </label>
+                  <input
+                    id="password"
+                    name="password"
+                    type="password"
+                    autoComplete={mode === "signin" ? "current-password" : "new-password"}
+                    required
+                    minLength={MIN_PASSWORD_LENGTH}
+                    value={password}
+                    onChange={(e) => { setPassword(e.target.value); setValidationError(""); }}
+                    placeholder={mode === "signin" ? "Your password" : "At least 8 characters"}
+                    className="mt-1.5 h-11 w-full rounded-btn border border-line bg-surface-2 px-3 text-sm text-foreground placeholder:text-muted focus:border-primary/60 focus:outline-none"
+                  />
+                </div>
+                {mode === "signin" && (
+                  <div className="text-right">
+                    <button
+                      type="button"
+                      onClick={() => { setMode("forgot"); setValidationError(""); setInfo(""); }}
+                      className="text-xs font-semibold text-primary-soft underline"
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+
+            {mode === "reset" && (
+              <div>
+                <label htmlFor="new-password" className="text-xs font-semibold text-muted">
+                  New password
+                </label>
+                <input
+                  id="new-password"
+                  name="new-password"
+                  type="password"
+                  autoComplete="new-password"
+                  required
+                  minLength={MIN_PASSWORD_LENGTH}
+                  value={newPassword}
+                  onChange={(e) => { setNewPassword(e.target.value); setValidationError(""); }}
+                  placeholder="At least 8 characters"
+                  className="mt-1.5 h-11 w-full rounded-btn border border-line bg-surface-2 px-3 text-sm text-foreground placeholder:text-muted focus:border-primary/60 focus:outline-none"
+                />
+              </div>
+            )}
 
             <button
               type="submit"
@@ -201,10 +415,14 @@ function SignInForm() {
               className="mt-1 flex h-11 w-full items-center justify-center gap-2 rounded-btn bg-brand px-4 font-semibold text-white shadow-glow transition-all hover:brightness-110 disabled:opacity-50"
             >
               {submitting ? (
-                mode === "signin" ? "Signing in..." : "Creating account..."
+                "Please wait…"
               ) : (
                 <>
-                  {mode === "signin" ? "Sign in" : "Create account"}
+                  {mode === "signin" && "Sign in"}
+                  {mode === "signup" && "Create account"}
+                  {mode === "verify" && "Verify email"}
+                  {mode === "forgot" && "Send reset code"}
+                  {mode === "reset" && "Update password"}
                   <ArrowRight className="h-4 w-4" aria-hidden />
                 </>
               )}
@@ -212,18 +430,26 @@ function SignInForm() {
           </form>
 
           <p className="mt-4 text-center text-xs text-muted">
-            {mode === "signin" ? (
+            {mode === "signin" && (
               <>
                 New to Swapify?{" "}
-                <button type="button" onClick={() => { setMode("signup"); setValidationError(""); }} className="font-semibold text-primary-soft underline">
+                <button type="button" onClick={() => { setMode("signup"); setValidationError(""); setInfo(""); }} className="font-semibold text-primary-soft underline">
                   Create an account
                 </button>
               </>
-            ) : (
+            )}
+            {mode === "signup" && (
               <>
                 Already have an account?{" "}
-                <button type="button" onClick={() => { setMode("signin"); setValidationError(""); }} className="font-semibold text-primary-soft underline">
+                <button type="button" onClick={() => { setMode("signin"); setValidationError(""); setInfo(""); }} className="font-semibold text-primary-soft underline">
                   Sign in
+                </button>
+              </>
+            )}
+            {(mode === "verify" || mode === "forgot" || mode === "reset") && (
+              <>
+                <button type="button" onClick={() => { setMode("signin"); setValidationError(""); setInfo(""); }} className="font-semibold text-primary-soft underline">
+                  Back to sign in
                 </button>
               </>
             )}
