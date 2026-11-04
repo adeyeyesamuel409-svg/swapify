@@ -1,5 +1,5 @@
-/**
- * Swapify brand mark: two hook-arrows in 180° rotational symmetry — the
+﻿/**
+ * Swapify brand mark: two hook-arrows in 180Â° rotational symmetry â€” the
  * completed-trade glyph. Fixed brand colors (pink + navy).
  */
 export default function SwapIcon({ className = "h-8 w-8" }: { className?: string }) {
@@ -25,15 +25,15 @@ export default function SwapIcon({ className = "h-8 w-8" }: { className?: string
           <path
             d="M31 37 C22 35 15 31 13.5 24 C12 16 18 10.5 26 9.5 C33 8.8 41 10.5 45.5 13.5"
             fill="none"
-            stroke="#14152F"
+            stroke="#3B4A6B"
             strokeWidth="7.5"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
           <path
             d="M44.5 20.5 L57 13.5 L44.5 6.5 Z"
-            fill="#14152F"
-            stroke="#14152F"
+            fill="#3B4A6B"
+            stroke="#3B4A6B"
             strokeWidth="3.5"
             strokeLinejoin="round"
           />
