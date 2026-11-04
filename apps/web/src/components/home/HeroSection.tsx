@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Lock, MapPin, PackagePlus, ShieldCheck, Sparkles, Star } from "lucide-react";
 import Button from "../Button";
+import { DrawUnderline, FadeUp, RevealWords, SwapReveal } from "../motion";
 import SwapMatchMotion from "./SwapMatchMotion";
 
 function SwapMotif() {
@@ -36,60 +37,73 @@ export default function HeroSection() {
 
       <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-4 pb-20 pt-16 sm:px-6 lg:grid-cols-2 lg:gap-14 lg:pt-24 lg:px-8">
         {/* ---------------- copy ---------------- */}
-        <div className="animate-fade-up">
-          <span className="inline-flex items-center gap-1.5 rounded-pill border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary-soft">
-            <Sparkles className="h-3.5 w-3.5" aria-hidden />
-            Hyper-local &middot; Fair value balancing &middot; Protected swaps
-          </span>
+        <div>
+          <FadeUp delay={0}>
+            <span className="inline-flex items-center gap-1.5 rounded-pill border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary-soft">
+              <Sparkles className="h-3.5 w-3.5" aria-hidden />
+              Hyper-local &middot; Fair value balancing &middot; Protected swaps
+            </span>
+          </FadeUp>
 
           <h1 className="mt-5 text-4xl font-bold leading-[1.06] tracking-tight text-navy sm:text-5xl lg:text-[3.4rem]">
-            Trade What You Have.{" "}
-            <span className="text-accent">Get What You Love.</span>
+            <RevealWords text="Trade What You Have." delay={0.15} />{" "}
+            <SwapReveal className="relative" delay={0.8}>
+              <span className="text-accent">Get What You Love.</span>
+              <DrawUnderline delay={1.2} />
+            </SwapReveal>
           </h1>
 
-          <p className="mt-5 max-w-lg text-lg leading-relaxed text-muted">
-            Turn dust-gatherers into instant upgrades with hyper-local direct swapping and smart
-            value balancing.
-          </p>
+          <FadeUp delay={1}>
+            <p className="mt-5 max-w-lg text-lg leading-relaxed text-muted">
+              Turn dust-gatherers into instant upgrades with hyper-local direct swapping and smart
+              value balancing.
+            </p>
+          </FadeUp>
 
-          <div className="mt-8 flex flex-wrap items-center gap-3">
-            <Button href="/browse" size="lg">
-              <MapPin className="h-4.5 w-4.5" aria-hidden />
-              Explore Swaps Near You
-            </Button>
-            <Button href="/post" size="lg" variant="secondary">
-              <PackagePlus className="h-4.5 w-4.5" aria-hidden />
-              Post an item
-            </Button>
-          </div>
+          <FadeUp delay={1.15}>
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <Button href="/browse" size="lg">
+                <MapPin className="h-4.5 w-4.5" aria-hidden />
+                Explore Swaps Near You
+              </Button>
+              <Button href="/post" size="lg" variant="secondary">
+                <PackagePlus className="h-4.5 w-4.5" aria-hidden />
+                Post an item
+              </Button>
+            </div>
+          </FadeUp>
 
-          <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted">
-            <span className="inline-flex items-center gap-1.5">
-              <ShieldCheck className="h-4 w-4 text-success" aria-hidden />
-              Payments held until both sides confirm
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <Lock className="h-4 w-4 text-primary-soft" aria-hidden />
-              Secure &amp; Encrypted Sign-In
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <Star className="h-4 w-4 fill-token-soft text-token-soft" aria-hidden />
-              Trusted local swappers
-            </span>
-          </div>
+          <FadeUp delay={1.35}>
+            <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted">
+              <span className="inline-flex items-center gap-1.5">
+                <ShieldCheck className="h-4 w-4 text-success" aria-hidden />
+                Payments held until both sides confirm
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Lock className="h-4 w-4 text-primary-soft" aria-hidden />
+                Secure &amp; Encrypted Sign-In
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Star className="h-4 w-4 fill-token-soft text-token-soft" aria-hidden />
+                Trusted local swappers
+              </span>
+            </div>
+          </FadeUp>
 
-          <div className="mt-8 flex flex-wrap items-center gap-2 text-xs">
-            <span className="text-muted">Popular:</span>
-            {["Electronics", "Furniture", "Bikes", "Collectibles"].map((c) => (
-              <Link
-                key={c}
-                href={`/browse?q=${encodeURIComponent(c)}`}
-                className="rounded-pill border border-line bg-surface px-3 py-1 font-semibold text-muted transition-colors hover:border-primary/50 hover:text-primary-soft"
-              >
-                {c}
-              </Link>
-            ))}
-          </div>
+          <FadeUp delay={1.5}>
+            <div className="mt-8 flex flex-wrap items-center gap-2 text-xs">
+              <span className="text-muted">Popular:</span>
+              {["Electronics", "Furniture", "Bikes", "Collectibles"].map((c) => (
+                <Link
+                  key={c}
+                  href={`/browse?q=${encodeURIComponent(c)}`}
+                  className="rounded-pill border border-line bg-surface px-3 py-1 font-semibold text-muted transition-colors hover:border-primary/50 hover:text-primary-soft"
+                >
+                  {c}
+                </Link>
+              ))}
+            </div>
+          </FadeUp>
         </div>
 
         {/* ---------------- high-res showcase ---------------- */}
