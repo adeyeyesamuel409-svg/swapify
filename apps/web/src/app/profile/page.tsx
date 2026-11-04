@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { authOptions } from "@/auth";
 import { fetchMe, fetchUserRatings } from "@/lib/api";
-import { mockVerification } from "@/lib/mock";
+import { mockVerified } from "@/lib/mock";
 import StarRating from "@/components/StarRating";
 import TrustBadges from "@/components/TrustBadges";
 import MyListings from "@/components/MyListings";
@@ -45,7 +45,7 @@ export default async function ProfilePage() {
             <p className="text-lg font-semibold text-navy">{user.name}</p>
             <p className="text-sm text-muted">{user.email}</p>
             <div className="mt-2">
-              <TrustBadges verified={mockVerification(user.id).verified} idVerified={mockVerification(user.id).idVerified} size="md" />
+              <TrustBadges verified={mockVerified(user.id)} size="md" />
             </div>
           </div>
           {ratings && ratings.total > 0 && (

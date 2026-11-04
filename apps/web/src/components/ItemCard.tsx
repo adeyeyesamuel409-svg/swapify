@@ -4,10 +4,10 @@ import { useState } from "react";
 import Link from "next/link";
 import { CATEGORY_LABELS, CONDITION_LABELS, ITEM_STATUS_LABELS } from "@swapify/shared";
 import { formatPence, timeAgo, type ApiItem } from "@/lib/api";
-import { mockProximity, mockTradePreference, mockTrust, mockVerification } from "@/lib/mock";
+import { mockProximity, mockTradePreference, mockTrust, mockVerified } from "@/lib/mock";
 import ItemImage from "@/components/ItemImage";
 import SwapBuilder from "@/components/swap/SwapBuilder";
-import { BadgeCheck, Clock, MapPin, Repeat, Star } from "lucide-react";
+import { BadgeCheck, MapPin, Repeat, Star } from "lucide-react";
 
 export default function ItemCard({ item }: { item: ApiItem }) {
   const [builderOpen, setBuilderOpen] = useState(false);
@@ -19,7 +19,7 @@ export default function ItemCard({ item }: { item: ApiItem }) {
   const distance = mockProximity(item.id);
   const trust = mockTrust(item.owner.id);
   const pref = mockTradePreference(item.id);
-  const verification = mockVerification(item.owner.id);
+  const verified = mockVerified(item.owner.id);
 
   return (
     <>
@@ -97,24 +97,8 @@ export default function ItemCard({ item }: { item: ApiItem }) {
               <span className="font-semibold text-foreground">{trust.rating}</span>
               <span className="text-muted/70">({trust.swaps} swaps)</span>
             </span>
-            <span className="inline-flex items-center gap-1.5">
-              <span
-                className={`inline-flex items-center gap-1 rounded-pill border px-2 py-0.5 text-[10px] font-semibold ${
-                  verification.idVerified
-                    ? "border-sky-500/40 bg-sky-50 text-sky-700 dark:bg-sky-950 dark:text-sky-300"
-                    : "border-amber-500/40 bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
-                }`}
-              >
-                {verification.idVerified ? (
-                  <BadgeCheck className="h-3 w-3" aria-hidden />
-                ) : (
-                  <Clock className="h-3 w-3" aria-hidden />
-                )}
-                {verification.idVerified ? "ID verified" : "ID pending"}
-              </span>
-              <span className="rounded-pill border border-line bg-surface-2 px-2 py-0.5 text-[10px] font-semibold text-muted">
-                {category}
-              </span>
+            <span className="rounded-pill border border-line bg-surface-2 px-2 py-0.5 text-[10px] font-semibold text-muted">
+              {category}
             </span>
           </div>
 
@@ -129,7 +113,7 @@ export default function ItemCard({ item }: { item: ApiItem }) {
                 )}
               </span>
               <span className="truncate text-xs text-muted">{item.owner.name}</span>
-              {verification.verified && (
+              {verified && (
                 <span className="inline-flex shrink-0 items-center gap-0.5 rounded-pill border border-emerald-500/40 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
                   <BadgeCheck className="h-2.5 w-2.5" aria-hidden />
                   Verified

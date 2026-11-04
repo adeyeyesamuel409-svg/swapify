@@ -33,15 +33,10 @@ export function mockTradePreference(id: string): "trades" | "cash" {
 }
 
 /**
- * Seller verification flags (design-only UI signals). Shown as trust badges
- * while the product is pre-launch; wire to real verification fields (ID check,
- * account verification) before public launch — badges must never out-run the
- * facts.
+ * Seller "Verified Swapper" flag (design-only UI signal). Shown as a trust
+ * badge while the product is pre-launch; email verification is the real
+ * account gate. Wire to a real trust/verification signal before public launch.
  */
-export function mockVerification(id: string): { verified: boolean; idVerified: boolean } {
-  const h = hashString(`v:${id}`);
-  return {
-    verified: h % 10 < 7,
-    idVerified: h % 10 < 5,
-  };
+export function mockVerified(id: string): boolean {
+  return hashString(`v:${id}`) % 10 < 7;
 }

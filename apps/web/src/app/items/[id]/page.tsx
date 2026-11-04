@@ -16,6 +16,7 @@ import { CATEGORY_LABELS, CONDITION_LABELS } from "@swapify/shared";
 import { mockProximity } from "@/lib/mock";
 import SwapRequestButton from "@/components/SwapRequestButton";
 import ItemInquiryButton from "@/components/ItemInquiryButton";
+import DeleteListingButton from "@/components/DeleteListingButton";
 import MobileActionBar from "@/components/MobileActionBar";
 import ItemGallery from "@/components/ItemGallery";
 import ItemCard from "@/components/ItemCard";
@@ -124,6 +125,19 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
               </p>
             </div>
 
+            {isOwnItem && session?.accessToken && (
+              <div className="mt-4 hidden sm:block">
+                <p className="mb-2 text-xs text-muted">
+                  Manage this listing — deleting removes it from the marketplace.
+                </p>
+                <DeleteListingButton
+                  accessToken={session.accessToken}
+                  itemId={item.id}
+                  itemTitle={item.title}
+                />
+              </div>
+            )}
+
             {!isOwnItem && (
               <div className="hidden sm:block">
                 {session?.accessToken ? (
@@ -176,7 +190,22 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
         </section>
       )}
       {/* sticky mobile action bar */}
-      {!isOwnItem && (
+      {isOwnItem ? (
+        session?.accessToken ? (
+          <MobileActionBar>
+            <div className="min-w-0">
+              <p className="text-[11px] text-muted">Your listing</p>
+              <p className="truncate text-base font-bold text-token">{formatPence(item.valuePence)}</p>
+            </div>
+            <DeleteListingButton
+              accessToken={session.accessToken}
+              itemId={item.id}
+              itemTitle={item.title}
+              className="ml-auto w-auto px-4"
+            />
+          </MobileActionBar>
+        ) : null
+      ) : (
         <MobileActionBar>
           <div className="min-w-0">
             <p className="text-[11px] text-muted">Value</p>

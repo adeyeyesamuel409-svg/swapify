@@ -1,5 +1,5 @@
 import { fetchUserProfile } from "@/lib/api";
-import { mockVerification } from "@/lib/mock";
+import { mockVerified } from "@/lib/mock";
 import StarRating from "./StarRating";
 import TrustBadges from "./TrustBadges";
 
@@ -21,7 +21,7 @@ export default async function SellerCard({ sellerId, sellerName, sellerImageUrl 
   const avg = profile?.rating.averageScore ?? null;
   const ratingTotal = profile?.rating.total ?? 0;
   const completedSwaps = profile?.completedSwaps ?? 0;
-  const verification = mockVerification(sellerId);
+  const verified = mockVerified(sellerId);
 
   return (
     <div className="mt-6 rounded-card border border-line bg-surface p-5 shadow-card">
@@ -38,7 +38,7 @@ export default async function SellerCard({ sellerId, sellerName, sellerImageUrl 
         <div className="min-w-0">
           <p className="truncate font-semibold text-navy">{sellerName}</p>
           <div className="mt-1">
-            <TrustBadges verified={verification.verified} idVerified={verification.idVerified} />
+            <TrustBadges verified={verified} />
           </div>
           <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted">
             {avg !== null ? (
