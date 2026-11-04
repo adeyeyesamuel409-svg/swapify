@@ -89,15 +89,15 @@ export default function HeroSection() {
         </div>
 
         {/* ---------------- high-res showcase ---------------- */}
-        <div className="relative">
+        <div className="relative mx-auto w-full max-w-[26rem] lg:max-w-none">
           <div className="overflow-hidden rounded-[28px] border border-line shadow-raise">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/swapify1.jpeg"
-              alt="A swapper using the Swapify app to arrange a local exchange"
-              width={1024}
-              height={768}
-              className="aspect-[4/3] w-full object-cover"
+              src="/swap3.jpg"
+              alt="A swapper wheeling a rail of clothes along a brick wall"
+              width={732}
+              height={1100}
+              className="aspect-[3/4] w-full object-cover object-[center_35%]"
             />
           </div>
 

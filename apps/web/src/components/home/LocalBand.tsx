@@ -54,11 +54,11 @@ export default function LocalBand() {
           <div className="overflow-hidden rounded-[28px] border border-line bg-surface shadow-raise">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/swapify2.jpeg"
-              alt="Illustration of a neighbourhood where items trade hands between houses"
-              width={1024}
-              height={576}
-              className="aspect-[16/9] w-full object-cover"
+              src="/swap4.jpg"
+              alt="People browsing clothing rails at an outdoor neighbourhood swap event"
+              width={735}
+              height={1102}
+              className="aspect-[3/4] w-full object-cover object-[center_45%]"
               loading="lazy"
             />
           </div>

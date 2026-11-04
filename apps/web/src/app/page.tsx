@@ -3,6 +3,7 @@ import HeroSection from "@/components/home/HeroSection";
 import StatsStrip from "@/components/home/StatsStrip";
 import CategoryStrip from "@/components/home/CategoryStrip";
 import DiscoveryFeedSection from "@/components/home/DiscoveryFeedSection";
+import CommunityBand from "@/components/home/CommunityBand";
 import LocalBand from "@/components/home/LocalBand";
 import HowItWorksSection from "@/components/home/HowItWorksSection";
 import ProtectedBand from "@/components/home/ProtectedBand";
@@ -25,6 +26,7 @@ export default async function Home() {
       <StatsStrip />
       <CategoryStrip />
       <DiscoveryFeedSection items={active} />
+      <CommunityBand />
       <LocalBand />
       <HowItWorksSection />
       <ProtectedBand />

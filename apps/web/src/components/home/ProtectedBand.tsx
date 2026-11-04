@@ -17,11 +17,11 @@ export default function ProtectedBand() {
             <div className="overflow-hidden rounded-[28px] border border-line shadow-raise">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/swapify3.jpeg"
-                alt="Neighbours exchanging a record player at the door while the Swapify app confirms the match"
-                width={1024}
-                height={576}
-                className="aspect-[16/9] w-full object-cover"
+                src="/swap6.jpg"
+                alt="Two people inspecting a jacket together at a clothing swap"
+                width={736}
+                height={730}
+                className="aspect-square w-full object-cover"
                 loading="lazy"
               />
             </div>
