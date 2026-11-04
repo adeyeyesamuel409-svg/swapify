@@ -461,10 +461,6 @@ function SignInForm() {
             <ShieldCheck className="h-4 w-4 text-primary-soft" aria-hidden />
             Secure &amp; Encrypted Sign-In
           </span>
-          <span className="inline-flex items-center gap-1.5">
-            <Lock className="h-4 w-4 text-primary-soft" aria-hidden />
-            Bank-Grade Account Security
-          </span>
         </div>
         <div className="mt-6 flex justify-center gap-5 text-xs text-muted">
           <Link href="/browse" className="inline-flex items-center gap-1.5 hover:text-foreground">
