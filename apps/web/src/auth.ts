@@ -1,7 +1,7 @@
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 
-// Auth migration (off AWS Cognito): credentials are verified by the Swapify API
+// Auth configuration: credentials are verified by the Swapify API
 // (/auth/login), which returns a signed API access token. That token is stored
 // in the NextAuth JWT and forwarded as `Authorization: Bearer` on API calls.
 // The API_URL here is read at runtime on the Next.js server (internal route).

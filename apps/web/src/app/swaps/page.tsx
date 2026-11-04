@@ -118,10 +118,13 @@ export default async function SwapsPage() {
           <p className="mt-1 text-sm text-muted">Please try again in a moment.</p>
         </div>
       ) : swaps.length === 0 ? (
-        <div className="mt-8 rounded-card border border-line bg-surface p-10 text-center">
-          <p className="text-muted">No swaps yet.</p>
-          <Link href="/browse" className="mt-2 inline-block text-sm font-semibold text-primary-soft hover:text-foreground">
-            Browse items to swap
+        <div className="mt-8 rounded-card border border-dashed border-line bg-surface p-10 text-center">
+          <p className="text-muted">No swaps yet — when you propose or receive one, it shows up here.</p>
+          <Link
+            href="/browse"
+            className="mt-4 inline-flex items-center gap-2 rounded-btn bg-brand px-5 py-2.5 font-semibold text-white shadow-glow transition-all hover:scale-[1.02] hover:brightness-110 active:scale-[0.98]"
+          >
+            Explore Swaps Near You
           </Link>
         </div>
       ) : (

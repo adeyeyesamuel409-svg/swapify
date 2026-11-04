@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useSession, signIn } from "next-auth/react";
-import { Check, ImageOff, X } from "lucide-react";
+import { Check, ImageOff, ShieldCheck, X } from "lucide-react";
 import Link from "next/link";
 import { createSwap, fetchMyItems, formatPence, type ApiItem } from "@/lib/api";
 import ItemImage from "@/components/ItemImage";
@@ -117,6 +117,10 @@ export default function SwapBuilder({
                 >
                   Sign in
                 </button>
+                <p className="mt-3 inline-flex items-center gap-1.5 text-xs text-muted">
+                  <ShieldCheck className="h-3.5 w-3.5 text-success" aria-hidden />
+                  Secure &amp; encrypted — your details are never shared
+                </p>
               </div>
             ) : created ? (
               <div className="py-10 text-center">

@@ -215,8 +215,8 @@ function SignInForm() {
     reset: "Choose a new password",
   };
   const subtitles: Record<Mode, string> = {
-    signin: "Sign in to offer swaps, chat, and balance value gaps.",
-    signup: "Create an account to list items and start swapping.",
+    signin: "Securely sign in to offer swaps, chat, and balance value gaps.",
+    signup: "Join a trusted community — list items and start swapping.",
     verify: "Enter the 6-digit code we emailed you to activate your account.",
     forgot: "We'll email you a 6-digit code to reset your password.",
     reset: "Enter the code and choose a new password.",
@@ -456,9 +456,15 @@ function SignInForm() {
           </p>
         </div>
 
-        <div className="mt-4 flex items-center justify-center gap-2 text-xs text-muted">
-          <ShieldCheck className="h-4 w-4 text-primary-soft" aria-hidden />
-          Passwords are hashed and never stored in plain text
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-muted">
+          <span className="inline-flex items-center gap-1.5">
+            <ShieldCheck className="h-4 w-4 text-primary-soft" aria-hidden />
+            Secure &amp; Encrypted Sign-In
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <Lock className="h-4 w-4 text-primary-soft" aria-hidden />
+            Bank-Grade Account Security
+          </span>
         </div>
         <div className="mt-6 flex justify-center gap-5 text-xs text-muted">
           <Link href="/browse" className="inline-flex items-center gap-1.5 hover:text-foreground">

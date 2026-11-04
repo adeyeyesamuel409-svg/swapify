@@ -13,6 +13,7 @@ import {
   GripVertical,
   ImagePlus,
   Inbox,
+  ShieldCheck,
   Tag,
   Upload,
   X,
@@ -53,6 +54,10 @@ export default function PostItemPage() {
             Sign in
           </button>{" "}
           to list your first item.
+        </p>
+        <p className="mt-3 inline-flex items-center gap-1.5 text-xs text-muted">
+          <ShieldCheck className="h-3.5 w-3.5 text-success" aria-hidden />
+          Secure &amp; encrypted — your details are never shared
         </p>
       </main>
     );

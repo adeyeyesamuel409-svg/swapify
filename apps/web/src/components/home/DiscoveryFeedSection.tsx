@@ -35,12 +35,12 @@ export default function DiscoveryFeedSection({ items }: { items: ApiItem[] }) {
             arrive. It takes about a minute.
           </p>
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-            <Button href="/post" size="md">
-              Post an item
-            </Button>
-            <Button href="/browse" size="md" variant="secondary">
+            <Button href="/browse" size="md">
               <MapPin className="h-4 w-4" aria-hidden />
-              Browse nearby
+              Explore Swaps Near You
+            </Button>
+            <Button href="/post" size="md" variant="secondary">
+              Post an item
             </Button>
           </div>
         </div>

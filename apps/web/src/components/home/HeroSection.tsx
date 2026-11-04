@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { MapPin, PackagePlus, ShieldCheck, Sparkles, Star } from "lucide-react";
+import { Lock, MapPin, PackagePlus, ShieldCheck, Sparkles, Star } from "lucide-react";
 import Button from "../Button";
 import SwapMatchMotion from "./SwapMatchMotion";
 
@@ -55,7 +55,7 @@ export default function HeroSection() {
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <Button href="/browse" size="lg">
               <MapPin className="h-4.5 w-4.5" aria-hidden />
-              Start Swapping Near You
+              Explore Swaps Near You
             </Button>
             <Button href="/post" size="lg" variant="secondary">
               <PackagePlus className="h-4.5 w-4.5" aria-hidden />
@@ -67,6 +67,10 @@ export default function HeroSection() {
             <span className="inline-flex items-center gap-1.5">
               <ShieldCheck className="h-4 w-4 text-success" aria-hidden />
               Payments held until both sides confirm
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <Lock className="h-4 w-4 text-primary-soft" aria-hidden />
+              Secure &amp; Encrypted Sign-In
             </span>
             <span className="inline-flex items-center gap-1.5">
               <Star className="h-4 w-4 fill-token-soft text-token-soft" aria-hidden />

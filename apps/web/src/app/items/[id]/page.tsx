@@ -18,7 +18,7 @@ import SwapRequestButton from "@/components/SwapRequestButton";
 import ItemGallery from "@/components/ItemGallery";
 import ItemCard from "@/components/ItemCard";
 import SellerCard from "@/components/SellerCard";
-import { ArrowLeft, MapPin, Sparkles } from "lucide-react";
+import { ArrowLeft, MapPin, ShieldCheck, Sparkles } from "lucide-react";
 
 export default async function ItemDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -128,12 +128,18 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
                   <SwapRequestButton targetItem={item} />
                 </div>
               ) : (
-                <Link
-                  href={`/api/auth/signin?callbackUrl=${encodeURIComponent(`/items/${item.id}`)}`}
-                  className="mt-4 hidden w-full items-center justify-center rounded-btn bg-brand px-4 py-3 font-semibold text-white shadow-glow transition-all hover:brightness-110 sm:flex"
-                >
-                  Sign in to request this swap
-                </Link>
+                <div className="hidden sm:block">
+                  <Link
+                    href={`/api/auth/signin?callbackUrl=${encodeURIComponent(`/items/${item.id}`)}`}
+                    className="mt-4 flex w-full items-center justify-center rounded-btn bg-brand px-4 py-3 font-semibold text-white shadow-glow transition-all hover:brightness-110"
+                  >
+                    Sign in to request this swap
+                  </Link>
+                  <p className="mt-2 inline-flex w-full items-center justify-center gap-1.5 text-xs text-muted">
+                    <ShieldCheck className="h-3.5 w-3.5 text-success" aria-hidden />
+                    Secure &amp; encrypted — your details are never shared
+                  </p>
+                </div>
               ))}
           </div>
 

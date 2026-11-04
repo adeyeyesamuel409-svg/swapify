@@ -127,9 +127,15 @@ export default async function BrowsePage({
         <div className="mt-12 flex flex-col items-center gap-3 rounded-card border border-dashed border-line bg-surface/50 py-16 text-center">
           <p className="text-foreground">No listings match your filters.</p>
           <p className="text-sm text-muted">Try a different keyword, category, or condition.</p>
-          <Link href="/browse" className="mt-2 text-sm font-semibold text-primary-soft hover:text-foreground">
-            Clear filters
-          </Link>
+          <div className="mt-2 flex flex-wrap items-center justify-center gap-3">
+            <Button href="/browse">
+              <Search className="h-4 w-4" aria-hidden />
+              Explore Swaps Near You
+            </Button>
+            <Link href="/browse" className="text-sm font-semibold text-primary-soft hover:text-foreground">
+              Clear filters
+            </Link>
+          </div>
         </div>
       ) : (
         <>
