@@ -1,4 +1,4 @@
-import { fetchItems, type ApiItem } from "@/lib/api";
+﻿import { fetchItems, type ApiItem } from "@/lib/api";
 import { CATEGORIES, CONDITIONS, CATEGORY_LABELS, CONDITION_LABELS } from "@swapify/shared";
 import Link from "next/link";
 import ItemCard from "@/components/ItemCard";
@@ -41,7 +41,7 @@ export default async function BrowsePage({
   }
 
   const inputClass =
-    "h-10 rounded-btn border border-line bg-surface-2 px-3 text-sm text-foreground placeholder:text-muted focus:border-primary/60 focus:outline-none";
+    "h-11 rounded-btn border border-line bg-surface-2 px-3 text-base text-foreground placeholder:text-muted focus:border-primary/60 focus:outline-none";
 
   const buildHref = (overrides: Record<string, string | number | undefined>) => {
     const next = new URLSearchParams();
@@ -63,7 +63,7 @@ export default async function BrowsePage({
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Browse listings</h1>
           <p className="mt-1 text-sm text-muted">
-            Swap for what you need with people nearby — no cash required.
+            Swap for what you need with people nearby â€” no cash required.
           </p>
         </div>
         <Button href="/post">
@@ -107,7 +107,7 @@ export default async function BrowsePage({
         </select>
         <button
           type="submit"
-          className="h-10 rounded-btn bg-surface-3 px-4 text-sm font-semibold text-foreground transition-colors hover:border-primary/60 hover:bg-surface-2"
+          className="min-h-[44px] rounded-btn bg-surface-3 px-4 text-sm font-semibold text-foreground transition-colors hover:border-primary/60 hover:bg-surface-2"
         >
           Filter
         </button>
@@ -115,7 +115,7 @@ export default async function BrowsePage({
 
       <p className="mt-6 text-sm text-muted">
         {total} listing{total === 1 ? "" : "s"}
-        {totalPages > 1 && ` · page ${page} of ${totalPages}`}
+        {totalPages > 1 && ` Â· page ${page} of ${totalPages}`}
       </p>
 
       {loadError ? (
@@ -190,3 +190,4 @@ export default async function BrowsePage({
     </main>
   );
 }
+

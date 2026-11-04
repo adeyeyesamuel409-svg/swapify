@@ -75,7 +75,7 @@ export default function MyListings({ accessToken }: { accessToken: string }) {
                 onClick={() => remove(item.id, item.title)}
                 title="Delete listing"
                 aria-label={`Delete listing ${item.title}`}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-btn border border-rose-500/40 text-rose-300 transition-colors hover:bg-rose-950 disabled:opacity-50"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-btn border border-rose-500/40 text-rose-300 transition-colors hover:bg-rose-950 disabled:opacity-50"
               >
                 <Trash2 className="h-4 w-4" aria-hidden />
               </button>

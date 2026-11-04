@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { signIn, signOut, useSession } from "next-auth/react";
@@ -41,7 +41,7 @@ function UserMenu() {
     <div className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex h-9 w-9 items-center justify-center rounded-pill bg-brand text-sm font-bold text-white shadow-glow"
+        className="flex h-11 w-11 items-center justify-center rounded-pill bg-brand text-sm font-bold text-white shadow-glow"
         aria-label="Account menu"
         aria-expanded={open}
       >
@@ -112,7 +112,7 @@ function SearchForm({ className = "", onDone }: { className?: string; onDone?: (
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search items..."
-          className="h-9 w-full rounded-btn border border-line bg-surface-2 pl-9 pr-3 text-sm text-foreground placeholder:text-muted focus:border-primary/60 focus:outline-none"
+          className="h-11 w-full rounded-btn border border-line bg-surface-2 pl-9 pr-3 text-base text-foreground placeholder:text-muted focus:border-primary/60 focus:outline-none"
         />
       </div>
     </form>
@@ -138,7 +138,7 @@ export default function SiteHeader() {
             <Link
               key={href}
               href={href}
-              className="rounded-md px-3 py-2 text-sm font-medium text-muted transition-colors hover:text-foreground"
+              className="flex min-h-[44px] items-center rounded-md px-3 py-2 text-sm font-medium text-muted transition-colors hover:text-foreground"
             >
               {label}
             </Link>
@@ -155,14 +155,14 @@ export default function SiteHeader() {
             ) : (
               <button
                 onClick={() => signIn(undefined, { callbackUrl: window.location.pathname })}
-                className="h-9 rounded-btn bg-brand px-4 text-sm font-semibold text-white shadow-glow transition-all hover:brightness-110"
+                className="min-h-[44px] rounded-btn bg-brand px-4 text-sm font-semibold text-white shadow-glow transition-all hover:brightness-110"
               >
                 Sign in / Sign up
               </button>
             )}
           </div>
           <button
-            className="flex h-9 w-9 items-center justify-center rounded-md border border-line text-foreground sm:hidden"
+            className="flex h-11 w-11 items-center justify-center rounded-md border border-line text-foreground sm:hidden"
             onClick={() => setMenuOpen((v) => !v)}
             aria-label="Toggle menu"
             aria-expanded={menuOpen}
@@ -181,7 +181,7 @@ export default function SiteHeader() {
                 key={href}
                 href={href}
                 onClick={() => setMenuOpen(false)}
-                className="rounded-md px-3 py-2.5 text-sm font-medium text-foreground/90 hover:bg-surface-2"
+                className="flex min-h-[44px] items-center rounded-md px-3 py-2.5 text-sm font-medium text-foreground/90 hover:bg-surface-2"
               >
                 {label}
               </Link>
@@ -197,7 +197,7 @@ export default function SiteHeader() {
             ) : (
               <button
                 onClick={() => signIn(undefined, { callbackUrl: window.location.pathname })}
-                className="ml-auto h-9 rounded-btn bg-brand px-4 text-sm font-semibold text-white"
+                className="ml-auto min-h-[44px] rounded-btn bg-brand px-4 text-sm font-semibold text-white"
               >
                 Sign in
               </button>
@@ -208,3 +208,4 @@ export default function SiteHeader() {
     </header>
   );
 }
+

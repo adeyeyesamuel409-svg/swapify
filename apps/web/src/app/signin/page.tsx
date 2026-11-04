@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState, Suspense } from "react";
 import { signIn } from "next-auth/react";
@@ -160,7 +160,7 @@ function SignInForm() {
         setNewPassword("");
         setCode("");
         setMode("signin");
-        setInfo("Password updated — sign in with your new password.");
+        setInfo("Password updated â€” sign in with your new password.");
         setSubmitting(false);
         return;
       }
@@ -175,7 +175,7 @@ function SignInForm() {
         const data = (await probe.json().catch(() => null)) as { error?: string } | null;
         if (data?.error === "EMAIL_NOT_VERIFIED") {
           setMode("verify");
-          setInfo(`Verify your email to continue — we sent a code to ${trimmedEmail}.`);
+          setInfo(`Verify your email to continue â€” we sent a code to ${trimmedEmail}.`);
           startCooldown();
           setSubmitting(false);
           return;
@@ -216,14 +216,14 @@ function SignInForm() {
   };
   const subtitles: Record<Mode, string> = {
     signin: "Securely sign in to offer swaps, chat, and balance value gaps.",
-    signup: "Join a trusted community — list items and start swapping.",
+    signup: "Join a trusted community â€” list items and start swapping.",
     verify: "Enter the 6-digit code we emailed you to activate your account.",
     forgot: "We'll email you a 6-digit code to reset your password.",
     reset: "Enter the code and choose a new password.",
   };
 
   return (
-    <main className="flex min-h-[calc(100vh-4rem)] w-full items-center justify-center px-4 py-12 sm:px-6">
+    <main className="flex min-h-[calc(100dvh-4rem)] w-full items-center justify-center px-4 py-12 sm:px-6">
       <div className="w-full max-w-md">
         <div className="rounded-card border border-line bg-surface p-6 shadow-card sm:p-8">
           <div className="flex flex-col items-center text-center">
@@ -245,7 +245,7 @@ function SignInForm() {
                 role="tab"
                 aria-selected={mode === "signin"}
                 onClick={() => { setMode("signin"); setValidationError(""); setInfo(""); }}
-                className={`rounded-md px-3 py-1.5 transition-colors ${mode === "signin" ? "bg-surface text-navy shadow-card" : "text-muted hover:text-foreground"}`}
+                className={`flex min-h-[44px] items-center justify-center rounded-md px-3 py-1.5 transition-colors ${mode === "signin" ? "bg-surface text-navy shadow-card" : "text-muted hover:text-foreground"}`}
               >
                 Sign in
               </button>
@@ -254,7 +254,7 @@ function SignInForm() {
                 role="tab"
                 aria-selected={mode === "signup"}
                 onClick={() => { setMode("signup"); setValidationError(""); setInfo(""); }}
-                className={`rounded-md px-3 py-1.5 transition-colors ${mode === "signup" ? "bg-surface text-navy shadow-card" : "text-muted hover:text-foreground"}`}
+                className={`flex min-h-[44px] items-center justify-center rounded-md px-3 py-1.5 transition-colors ${mode === "signup" ? "bg-surface text-navy shadow-card" : "text-muted hover:text-foreground"}`}
               >
                 Create account
               </button>
@@ -287,7 +287,7 @@ function SignInForm() {
                   value={email}
                   onChange={(e) => { setEmail(e.target.value); setValidationError(""); }}
                   placeholder="you@example.com"
-                  className="mt-1.5 h-11 w-full rounded-btn border border-line bg-surface-2 px-3 text-sm text-foreground placeholder:text-muted focus:border-primary/60 focus:outline-none"
+                  className="mt-1.5 h-11 w-full rounded-btn border border-line bg-surface-2 px-3 text-base text-foreground placeholder:text-muted focus:border-primary/60 focus:outline-none"
                 />
               </div>
             )}
@@ -338,7 +338,7 @@ function SignInForm() {
                       value={name}
                       onChange={(e) => { setName(e.target.value); setValidationError(""); }}
                       placeholder="Alex Smith"
-                      className="mt-1.5 h-11 w-full rounded-btn border border-line bg-surface-2 px-3 text-sm text-foreground placeholder:text-muted focus:border-primary/60 focus:outline-none"
+                      className="mt-1.5 h-11 w-full rounded-btn border border-line bg-surface-2 px-3 text-base text-foreground placeholder:text-muted focus:border-primary/60 focus:outline-none"
                     />
                   </div>
                 )}
@@ -355,7 +355,7 @@ function SignInForm() {
                     value={email}
                     onChange={(e) => { setEmail(e.target.value); setValidationError(""); }}
                     placeholder="you@example.com"
-                    className="mt-1.5 h-11 w-full rounded-btn border border-line bg-surface-2 px-3 text-sm text-foreground placeholder:text-muted focus:border-primary/60 focus:outline-none"
+                    className="mt-1.5 h-11 w-full rounded-btn border border-line bg-surface-2 px-3 text-base text-foreground placeholder:text-muted focus:border-primary/60 focus:outline-none"
                   />
                 </div>
                 <div>
@@ -372,7 +372,7 @@ function SignInForm() {
                     value={password}
                     onChange={(e) => { setPassword(e.target.value); setValidationError(""); }}
                     placeholder={mode === "signin" ? "Your password" : "At least 8 characters"}
-                    className="mt-1.5 h-11 w-full rounded-btn border border-line bg-surface-2 px-3 text-sm text-foreground placeholder:text-muted focus:border-primary/60 focus:outline-none"
+                    className="mt-1.5 h-11 w-full rounded-btn border border-line bg-surface-2 px-3 text-base text-foreground placeholder:text-muted focus:border-primary/60 focus:outline-none"
                   />
                 </div>
                 {mode === "signin" && (
@@ -404,7 +404,7 @@ function SignInForm() {
                   value={newPassword}
                   onChange={(e) => { setNewPassword(e.target.value); setValidationError(""); }}
                   placeholder="At least 8 characters"
-                  className="mt-1.5 h-11 w-full rounded-btn border border-line bg-surface-2 px-3 text-sm text-foreground placeholder:text-muted focus:border-primary/60 focus:outline-none"
+                  className="mt-1.5 h-11 w-full rounded-btn border border-line bg-surface-2 px-3 text-base text-foreground placeholder:text-muted focus:border-primary/60 focus:outline-none"
                 />
               </div>
             )}
@@ -415,7 +415,7 @@ function SignInForm() {
               className="mt-1 flex h-11 w-full items-center justify-center gap-2 rounded-btn bg-brand px-4 font-semibold text-white shadow-glow transition-all hover:brightness-110 disabled:opacity-50"
             >
               {submitting ? (
-                "Please wait…"
+                "Please waitâ€¦"
               ) : (
                 <>
                   {mode === "signin" && "Sign in"}
@@ -484,3 +484,4 @@ export default function SignInPage() {
     </Suspense>
   );
 }
+

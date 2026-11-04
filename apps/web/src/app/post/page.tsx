@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useSession, signIn } from "next-auth/react";
 import { createItem, formatPence, uploadImages } from "@/lib/api";
 import ItemImage from "@/components/ItemImage";
+import MobileActionBar from "@/components/MobileActionBar";
 import { CATEGORIES, CONDITIONS, CATEGORY_LABELS, CONDITION_LABELS } from "@swapify/shared";
 import {
   Check,
@@ -141,7 +142,7 @@ export default function PostItemPage() {
   };
 
   const field =
-    "h-11 rounded-btn border border-line bg-surface px-3.5 text-sm text-foreground placeholder:text-muted focus:border-primary/60 focus:outline-none";
+    "h-11 rounded-btn border border-line bg-surface px-3.5 text-base text-foreground placeholder:text-muted focus:border-primary/60 focus:outline-none";
   const label = "mt-5 block text-sm font-semibold text-navy";
   const valuePence = Math.round(Number(form.valuePounds || 0) * 100);
 
@@ -232,28 +233,28 @@ export default function PostItemPage() {
                     type="button"
                     onClick={() => setImages(images.filter((u) => u !== url))}
                     aria-label={`Remove image ${index + 1}`}
-                    className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-navy/70 text-white opacity-0 transition-opacity hover:bg-danger group-hover:opacity-100"
+                    className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded-full bg-navy/70 text-white transition-opacity after:absolute after:-inset-2 after:content-[''] hover:bg-danger opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
                   >
-                    <X className="h-3 w-3" aria-hidden />
+                    <X className="h-3.5 w-3.5" aria-hidden />
                   </button>
-                  <div className="absolute inset-x-0 bottom-0 flex justify-between px-1 pb-1 opacity-0 transition-opacity group-hover:opacity-100">
+                  <div className="absolute inset-x-0 bottom-0 flex justify-between px-1 pb-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
                     <button
                       type="button"
                       onClick={() => moveImage(index, index - 1)}
                       disabled={index === 0}
                       aria-label="Move image left"
-                      className="flex h-5 w-5 items-center justify-center rounded-full bg-navy/70 text-white disabled:opacity-40"
+                      className="relative flex h-7 w-7 items-center justify-center rounded-full bg-navy/70 text-white after:absolute after:-inset-2 after:content-[''] disabled:opacity-40"
                     >
-                      <ChevronLeft className="h-3 w-3" aria-hidden />
+                      <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
                     </button>
                     <button
                       type="button"
                       onClick={() => moveImage(index, index + 1)}
                       disabled={index === images.length - 1}
                       aria-label="Move image right"
-                      className="flex h-5 w-5 items-center justify-center rounded-full bg-navy/70 text-white disabled:opacity-40"
+                      className="relative flex h-7 w-7 items-center justify-center rounded-full bg-navy/70 text-white after:absolute after:-inset-2 after:content-[''] disabled:opacity-40"
                     >
-                      <ChevronRight className="h-3 w-3" aria-hidden />
+                      <ChevronRight className="h-3.5 w-3.5" aria-hidden />
                     </button>
                   </div>
                 </div>
@@ -265,7 +266,7 @@ export default function PostItemPage() {
           <label className={label}>Or add a photo by URL (external hosting)</label>
           <div className="mt-1 flex gap-2">
             <input className={`${field} flex-1`} value={form.imageUrl} onChange={(e) => setForm({ ...form, imageUrl: e.target.value })} placeholder="https://example.com/image.jpg" />
-            <button type="button" onClick={addImageUrl} className="rounded-btn border border-line bg-surface-2 px-4 text-sm font-semibold text-foreground transition-colors hover:border-primary/60">
+            <button type="button" onClick={addImageUrl} className="min-h-[44px] rounded-btn border border-line bg-surface-2 px-4 text-sm font-semibold text-foreground transition-colors hover:border-primary/60">
               Add
             </button>
           </div>
@@ -288,7 +289,7 @@ export default function PostItemPage() {
                   type="button"
                   onClick={() => setForm({ ...form, condition: c })}
                   aria-pressed={active}
-                  className={`inline-flex items-center gap-1 rounded-pill border px-3.5 py-1.5 text-xs font-semibold transition-all ${
+                  className={`inline-flex min-h-[44px] items-center gap-1 rounded-pill border px-3.5 py-1.5 text-xs font-semibold transition-all ${
                     active
                       ? "border-primary bg-primary text-white shadow-glow"
                       : "border-line bg-surface text-muted hover:border-primary/50 hover:text-foreground"
@@ -343,7 +344,7 @@ export default function PostItemPage() {
                   type="button"
                   onClick={() => toggleOpenTo(c)}
                   aria-pressed={active}
-                  className={`inline-flex items-center gap-1 rounded-pill border px-3 py-1.5 text-xs font-semibold transition-all ${
+                  className={`inline-flex min-h-[44px] items-center gap-1 rounded-pill border px-3 py-1.5 text-xs font-semibold transition-all ${
                     active
                       ? "border-token/50 bg-token/15 text-token"
                       : "border-line bg-surface text-muted hover:border-token/50 hover:text-foreground"
@@ -416,16 +417,16 @@ export default function PostItemPage() {
       </div>
 
       {/* sticky mobile action bar */}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur sm:hidden">
+      <MobileActionBar>
         <button
           type="button"
           onClick={submit}
           disabled={submitting || uploading}
-          className="w-full rounded-btn bg-brand px-4 py-3 font-semibold text-white shadow-glow transition-all active:scale-[0.99] disabled:opacity-50"
+          className="min-h-[44px] w-full rounded-btn bg-brand px-4 py-2.5 font-semibold text-white shadow-glow transition-all active:scale-[0.99] disabled:opacity-50"
         >
           {submitting ? "Posting..." : "Post item"}
         </button>
-      </div>
+      </MobileActionBar>
     </main>
   );
 }

@@ -15,6 +15,7 @@ import {
 import { CATEGORY_LABELS, CONDITION_LABELS } from "@swapify/shared";
 import { mockProximity } from "@/lib/mock";
 import SwapRequestButton from "@/components/SwapRequestButton";
+import MobileActionBar from "@/components/MobileActionBar";
 import ItemGallery from "@/components/ItemGallery";
 import ItemCard from "@/components/ItemCard";
 import SellerCard from "@/components/SellerCard";
@@ -78,7 +79,7 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
   const conditionLabel = CONDITION_LABELS[item.condition as keyof typeof CONDITION_LABELS] ?? item.condition;
 
   return (
-    <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-10 sm:px-6">
+    <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-28 pt-10 sm:px-6 sm:pb-10">
       <Link href="/browse" className="inline-flex items-center gap-1.5 text-sm font-medium text-primary-soft hover:text-foreground">
         <ArrowLeft className="h-4 w-4" aria-hidden />
         Back to browse
@@ -173,7 +174,7 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
       )}
       {/* sticky mobile action bar */}
       {!isOwnItem && (
-        <div className="fixed inset-x-0 bottom-0 z-30 flex items-center gap-3 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur sm:hidden">
+        <MobileActionBar>
           <div className="min-w-0">
             <p className="text-[11px] text-muted">Value</p>
             <p className="truncate text-base font-bold text-token">{formatPence(item.valuePence)}</p>
@@ -183,12 +184,12 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
           ) : (
             <Link
               href={`/api/auth/signin?callbackUrl=${encodeURIComponent(`/items/${item.id}`)}`}
-              className="ml-auto rounded-btn bg-brand px-5 py-2.5 font-semibold text-white shadow-glow"
+              className="ml-auto min-h-[44px] rounded-btn bg-brand px-5 py-2.5 font-semibold text-white shadow-glow"
             >
               Sign in to swap
             </Link>
           )}
-        </div>
+        </MobileActionBar>
       )}
     </main>
   );

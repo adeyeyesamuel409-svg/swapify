@@ -49,7 +49,7 @@ export default async function SwapDetailPage({ params }: { params: Promise<{ id:
   const completed = swap.status === "COMPLETED";
 
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-12 sm:px-6">
+    <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-28 pt-12 sm:px-6 sm:pb-12">
       <Link href="/swaps" className="text-sm font-medium text-primary-soft hover:text-foreground">
         &larr; My swaps
       </Link>
@@ -143,10 +143,10 @@ export default async function SwapDetailPage({ params }: { params: Promise<{ id:
           </div>
         )}
 
-        <SwapActions swap={swap} accessToken={session.accessToken!} myUserId={user.id} />
+        <SwapActions swap={swap} accessToken={session.accessToken!} myUserId={user.id} sticky />
       </div>
 
-      <SwapChat swapId={swap.id} accessToken={session.accessToken!} myUserId={user.id} active={active} />
+      <SwapChat swap={swap} accessToken={session.accessToken!} myUserId={user.id} active={active} />
       {completed && (
         <RatingBox swapId={swap.id} accessToken={session.accessToken!} myUserId={user.id} otherPartyName={otherPartyName} />
       )}

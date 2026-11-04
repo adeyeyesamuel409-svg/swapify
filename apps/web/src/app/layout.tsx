@@ -22,6 +22,15 @@ export const metadata: Metadata = {
     "Turn dust-gatherers into instant upgrades with hyper-local direct swapping and smart value balancing.",
 };
 
+// Mobile viewport: resizes the layout when the virtual keyboard opens so
+// sticky composers/action bars stay visible on Android (iOS is handled via
+// visualViewport listeners + dvh units).
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  interactiveWidget: "resizes-content",
+};
+
 const themeBootstrap = `
 (function () {
   try {

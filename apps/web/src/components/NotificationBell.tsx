@@ -34,7 +34,7 @@ export default function NotificationBell() {
   return (
     <Link
       href="/notifications"
-      className="relative flex h-9 w-9 items-center justify-center rounded-btn border border-line bg-surface-2 text-muted transition-colors hover:border-primary/60 hover:text-foreground"
+      className="relative flex h-11 w-11 items-center justify-center rounded-btn border border-line bg-surface-2 text-muted transition-colors hover:border-primary/60 hover:text-foreground"
       aria-label="Notifications"
     >
       <Bell className="h-4 w-4" aria-hidden />

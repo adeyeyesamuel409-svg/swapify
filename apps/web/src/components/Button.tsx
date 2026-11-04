@@ -5,7 +5,7 @@ type Variant = "primary" | "secondary" | "ghost" | "token";
 type Size = "sm" | "md" | "lg";
 
 const base =
-  "inline-flex items-center justify-center gap-2 rounded-btn font-semibold transition-all duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:pointer-events-none disabled:opacity-60";
+  "inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-2 rounded-btn font-semibold transition-all duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:pointer-events-none disabled:opacity-60";
 
 const variants: Record<Variant, string> = {
   primary:
@@ -19,8 +19,8 @@ const variants: Record<Variant, string> = {
 };
 
 const sizes: Record<Size, string> = {
-  sm: "h-8 px-3 text-xs",
-  md: "h-10 px-4 text-sm",
+  sm: "h-10 px-3.5 text-xs",
+  md: "h-11 px-4 text-sm",
   lg: "h-12 px-6 text-base",
 };
 

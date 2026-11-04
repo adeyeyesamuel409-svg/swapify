@@ -40,7 +40,7 @@ export default function CategoryStrip() {
             <Link
               key={category}
               href={`/browse?category=${category}`}
-              className="group inline-flex items-center gap-1.5 rounded-pill border border-line bg-surface px-3.5 py-2 text-xs font-semibold text-muted transition-all hover:-translate-y-0.5 hover:border-primary/50 hover:text-primary-soft"
+              className="group inline-flex min-h-[44px] items-center gap-1.5 rounded-pill border border-line bg-surface px-3.5 py-2 text-xs font-semibold text-muted transition-all hover:-translate-y-0.5 hover:border-primary/50 hover:text-primary-soft"
             >
               <Icon className="h-3.5 w-3.5" aria-hidden />
               {CATEGORY_LABELS[category]}

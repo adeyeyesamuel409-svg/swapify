@@ -97,7 +97,7 @@ export default function SwapBuilder({
               type="button"
               onClick={onClose}
               aria-label="Close swap builder"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-pill border border-line text-muted transition-colors hover:border-primary/40 hover:text-foreground"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-pill border border-line text-muted transition-colors hover:border-primary/40 hover:text-foreground"
             >
               <X className="h-4 w-4" aria-hidden />
             </button>
@@ -113,7 +113,7 @@ export default function SwapBuilder({
                 <button
                   type="button"
                   onClick={() => signIn(undefined, { callbackUrl: window.location.pathname })}
-                  className="mt-4 rounded-btn bg-brand px-5 py-2.5 font-semibold text-white shadow-glow transition-all hover:scale-[1.02]"
+                  className="mt-4 min-h-[44px] rounded-btn bg-brand px-5 py-2.5 font-semibold text-white shadow-glow transition-all hover:scale-[1.02]"
                 >
                   Sign in
                 </button>
@@ -241,7 +241,7 @@ export default function SwapBuilder({
                   type="button"
                   onClick={submit}
                   disabled={!selectedId || submitting}
-                  className="rounded-btn bg-brand px-6 py-2.5 font-semibold text-white shadow-glow transition-all hover:scale-[1.02] hover:brightness-110 active:scale-[0.98] disabled:opacity-50"
+                  className="min-h-[44px] rounded-btn bg-brand px-6 py-2.5 font-semibold text-white shadow-glow transition-all hover:scale-[1.02] hover:brightness-110 active:scale-[0.98] disabled:opacity-50"
                 >
                   {submitting ? "Sending…" : "Propose swap"}
                 </button>
