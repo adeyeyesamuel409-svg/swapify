@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState, Suspense } from "react";
 import { signIn } from "next-auth/react";
@@ -160,7 +160,7 @@ function SignInForm() {
         setNewPassword("");
         setCode("");
         setMode("signin");
-        setInfo("Password updated â€” sign in with your new password.");
+        setInfo("Password updated — sign in with your new password.");
         setSubmitting(false);
         return;
       }
@@ -175,7 +175,7 @@ function SignInForm() {
         const data = (await probe.json().catch(() => null)) as { error?: string } | null;
         if (data?.error === "EMAIL_NOT_VERIFIED") {
           setMode("verify");
-          setInfo(`Verify your email to continue â€” we sent a code to ${trimmedEmail}.`);
+          setInfo(`Verify your email to continue — we sent a code to ${trimmedEmail}.`);
           startCooldown();
           setSubmitting(false);
           return;
@@ -216,7 +216,7 @@ function SignInForm() {
   };
   const subtitles: Record<Mode, string> = {
     signin: "Securely sign in to offer swaps, chat, and balance value gaps.",
-    signup: "Join a trusted community â€” list items and start swapping.",
+    signup: "Join a trusted community — list items and start swapping.",
     verify: "Enter the 6-digit code we emailed you to activate your account.",
     forgot: "We'll email you a 6-digit code to reset your password.",
     reset: "Enter the code and choose a new password.",
@@ -415,7 +415,7 @@ function SignInForm() {
               className="mt-1 flex h-11 w-full items-center justify-center gap-2 rounded-btn bg-brand px-4 font-semibold text-white shadow-glow transition-all hover:brightness-110 disabled:opacity-50"
             >
               {submitting ? (
-                "Please waitâ€¦"
+                "Please wait…"
               ) : (
                 <>
                   {mode === "signin" && "Sign in"}

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -83,7 +83,7 @@ export default function InboxClient({
         </span>
         <h2 className="mt-4 text-xl font-bold text-navy">No questions yet</h2>
         <p className="mx-auto mt-2 max-w-md text-sm text-muted">
-          When you ask a seller about an item â€” or someone asks you â€” the conversation shows up here.
+          When you ask a seller about an item — or someone asks you — the conversation shows up here.
         </p>
         <Link
           href="/browse"
@@ -182,7 +182,7 @@ export default function InboxClient({
                 </div>
               ) : null
             }
-            emptyText="Ask about condition, collection, or anything else â€” the seller usually replies quickly."
+            emptyText="Ask about condition, collection, or anything else — the seller usually replies quickly."
           />
         ) : (
           <div className="flex min-h-[300px] flex-col items-center justify-center gap-3 p-10 text-center">

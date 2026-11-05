@@ -1,4 +1,4 @@
-﻿import Fastify, { FastifyError, FastifyInstance } from 'fastify';
+import Fastify, { FastifyError, FastifyInstance } from 'fastify';
 import rawBody from 'fastify-raw-body';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
@@ -84,8 +84,8 @@ export async function buildApp(): Promise<FastifyInstance> {
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
   });
 
-  // â”€â”€ Rate limiting â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // Global default: 200 requests/min/IP â€” generous enough for normal browsing
+  // ---------------------------- Rate limiting ----------------------------
+  // Global default: 200 requests/min/IP — generous enough for normal browsing
   // while blocking brute-force and scripted abuse. Sensitive routes get
   // tighter per-route limits applied via route-level config.
   await app.register(rateLimit, {
@@ -94,13 +94,13 @@ export async function buildApp(): Promise<FastifyInstance> {
     addHeadersOnExceeding: { 'x-ratelimit-limit': true, 'x-ratelimit-remaining': true },
     addHeaders: { 'x-ratelimit-limit': true, 'x-ratelimit-remaining': true, 'retry-after': true },
     errorResponseBuilder: (_request, context) => ({
-      error: 'Too many requests â€” please try again later',
+      error: 'Too many requests — please try again later',
       statusCode: 429,
       retryAfter: Math.ceil(context.ttl / 1000),
     }),
   });
 
-  // â”€â”€ Security headers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ---------------------------- Security headers ----------------------------
   // Applied via an onRequest hook so they are present on every response
   // without adding a new dependency.
   app.addHook('onRequest', async (_request, reply) => {
