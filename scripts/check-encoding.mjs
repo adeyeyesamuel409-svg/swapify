@@ -1,5 +1,7 @@
 // Fails if source files contain mojibake (UTF-8 text that was misdecoded and
-// re-encoded, e.g. "â€"" instead of an em-dash). Run: npm run check:encoding
+// re-encoded, e.g. "â€"" instead of an em-dash) or if the brand mark assets
+// lose their known-good signatures (guards against text-surgery corruption).
+// Run: npm run check:encoding
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
@@ -34,8 +36,30 @@ for (const root of ROOTS) {
   }
 }
 
+// Brand-asset signatures: the swap-arrows mark must keep its exact geometry and
+// approved colors in both the header logo component and the favicon.
+const BRAND_CHECKS = [
+  {
+    file: "apps/web/src/components/SwapIcon.tsx",
+    mustContain: ["M31 37", "rotate(180 32 32)", "#F12A7B", "#3B4A6B"],
+  },
+  {
+    file: "apps/web/src/app/icon.svg",
+    mustContain: ["M31 37", "rotate(180 32 32)", "#F12A7B", "#3B4A6B"],
+  },
+];
+for (const check of BRAND_CHECKS) {
+  const text = readFileSync(check.file, "utf8");
+  for (const needle of check.mustContain) {
+    if (!text.includes(needle)) {
+      bad += 1;
+      console.log(`BRAND_DRIFT ${check.file}: missing "${needle}"`);
+    }
+  }
+}
+
 if (bad > 0) {
-  console.error(`\ncheck:encoding FAILED — ${bad} mojibake occurrence(s). Fix before shipping.`);
+  console.error(`\ncheck:encoding FAILED — ${bad} problem(s). Fix before shipping.`);
   process.exit(1);
 }
-console.log("check:encoding OK — no mojibake in source.");
+console.log("check:encoding OK — no mojibake, brand assets intact.");
