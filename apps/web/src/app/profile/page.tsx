@@ -7,6 +7,7 @@ import { mockVerified } from "@/lib/mock";
 import StarRating from "@/components/StarRating";
 import TrustBadges from "@/components/TrustBadges";
 import MyListings from "@/components/MyListings";
+import PaymentMethodsSection from "@/components/PaymentMethodsSection";
 import AddressBookSection from "@/components/AddressBookSection";
 import BalanceSection from "@/components/BalanceSection";
 import PayoutSetupSection from "@/components/PayoutSetupSection";
@@ -62,17 +63,29 @@ export default async function ProfilePage() {
 
       <MyListings accessToken={session.accessToken} />
 
-      <div id="balance-section">
-        <BalanceSection accessToken={session.accessToken} />
-      </div>
+      <section aria-label="Payments" className="flex flex-col gap-6">
+        <div>
+          <h2 className="text-xl font-bold tracking-tight text-navy">Payments</h2>
+          <p className="mt-1 text-sm text-muted">
+            Money from a swap shows as Pending until both sides confirm, then becomes Available.
+            Withdraw to your bank anytime. Refunds go straight back to your card.
+          </p>
+        </div>
 
-      <PayoutSetupSection accessToken={session.accessToken} />
+        <div id="balance-section">
+          <BalanceSection accessToken={session.accessToken} />
+        </div>
 
-      <div id="withdrawal-form">
-        <WithdrawalForm accessToken={session.accessToken} />
-      </div>
+        <PaymentMethodsSection accessToken={session.accessToken} />
 
-      <WithdrawalHistory accessToken={session.accessToken} />
+        <PayoutSetupSection accessToken={session.accessToken} />
+
+        <div id="withdrawal-form">
+          <WithdrawalForm accessToken={session.accessToken} />
+        </div>
+
+        <WithdrawalHistory accessToken={session.accessToken} />
+      </section>
 
       <AddressBookSection accessToken={session.accessToken} />
 

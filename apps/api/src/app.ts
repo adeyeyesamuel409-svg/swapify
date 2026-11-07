@@ -12,6 +12,7 @@ import { swapRoutes } from './routes/swaps.js';
 import { stripeRoutes } from './routes/stripe.js';
 import { chatRoutes } from './routes/chat.js';
 import { inquiryRoutes } from './routes/inquiries.js';
+import { paymentMethodRoutes } from './routes/payment-methods.js';
 import { ratingRoutes } from './routes/ratings.js';
 import { userRoutes } from './routes/users.js';
 import { wishlistRoutes } from './routes/wishlists.js';
@@ -147,6 +148,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   app.register(stripeRoutes);
   app.register(chatRoutes);
   app.register(inquiryRoutes);
+  app.register(paymentMethodRoutes);
   app.register(ratingRoutes);
   app.register(userRoutes);
   app.register(uploadRoutes);

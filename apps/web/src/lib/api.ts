@@ -356,6 +356,33 @@ export function sendInquiryMessage(
   }>;
 }
 
+// --- Saved payment cards (buyer side) -----------------------------------
+
+export type ApiSavedCard = {
+  id: string;
+  brand: string;
+  last4: string;
+  expMonth: number;
+  expYear: number;
+  isDefault: boolean;
+};
+
+export function fetchPaymentMethods(accessToken: string): Promise<{ cards: ApiSavedCard[] }> {
+  return apiFetch("/users/me/payment-methods", accessToken);
+}
+
+export function createCardSetupSession(accessToken: string): Promise<{ url: string }> {
+  return apiSend("/users/me/payment-methods/setup", accessToken, "POST") as Promise<{ url: string }>;
+}
+
+export function setDefaultPaymentMethod(accessToken: string, paymentMethodId: string): Promise<{ ok: boolean }> {
+  return apiSend(`/users/me/payment-methods/${paymentMethodId}/default`, accessToken, "POST") as Promise<{ ok: boolean }>;
+}
+
+export function removePaymentMethod(accessToken: string, paymentMethodId: string): Promise<{ ok: boolean }> {
+  return apiSend(`/users/me/payment-methods/${paymentMethodId}`, accessToken, "DELETE") as Promise<{ ok: boolean }>;
+}
+
 
 
 // --- Ratings ------------------------------------------------------------

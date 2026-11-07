@@ -46,6 +46,7 @@ export async function createSwapPaymentCheckout(
   higherValuePence: number,
   successUrl: string,
   cancelUrl: string,
+  customerId?: string,
 ): Promise<CheckoutResult> {
   if (!stripeEnabled) {
     if (!simulationAllowed) {
@@ -57,6 +58,7 @@ export async function createSwapPaymentCheckout(
   const session = await getStripe().checkout.sessions.create({
     mode: 'payment',
     payment_method_types: ['card'],
+    ...(customerId ? { customer: customerId, setup_future_usage: 'on_session' as const } : {}),
     line_items: [
       {
         price_data: {

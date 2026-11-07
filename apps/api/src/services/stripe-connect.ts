@@ -34,7 +34,11 @@ const log = pino({ name: 'stripe-connect', level: process.env.LOG_LEVEL ?? 'info
 export type ConnectedAccountInternalStatus = 'ONBOARDING' | 'ACTIVE' | 'RESTRICTED' | 'DISABLED';
 
 export function mapAccountStatus(account: Stripe.Account): ConnectedAccountInternalStatus {
-  if (account.requirements?.disabled_reason) {
+  const disabled = account.requirements?.disabled_reason;
+  // Only genuinely blocked accounts are DISABLED. "requirements.*" reasons are
+  // resolvable (finish onboarding / send info) and must not dead-end the user
+  // behind a "contact support" message.
+  if (disabled && (disabled.startsWith('rejected.') || disabled === 'platform_paused' || disabled.startsWith('paused.'))) {
     return 'DISABLED';
   }
   if (

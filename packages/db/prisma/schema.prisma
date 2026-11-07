@@ -60,6 +60,8 @@ model User {
   passwordHash    String?
   // Set once the email verification code has been accepted. NULL blocks login.
   emailVerified   DateTime?
+  // Stripe Customer id for saved payment cards (buyer side).
+  stripeCustomerId String?       @unique
   emailCodes      EmailCode[]
   items           Item[]
   wishlists       Wishlist[]

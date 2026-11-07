@@ -17,7 +17,7 @@ const STATUS_CONFIG: Record<string, { label: string; tone: "emerald" | "amber" |
   ONBOARDING: { label: "In progress", tone: "amber", message: "Complete your payout setup." },
   ACTIVE: { label: "Ready", tone: "emerald", message: "Payouts are ready." },
   RESTRICTED: { label: "Restricted", tone: "amber", message: "Additional information is required." },
-  DISABLED: { label: "Unavailable", tone: "rose", message: "Payouts are currently unavailable." },
+  DISABLED: { label: "Unavailable", tone: "rose", message: "Payouts were disabled by Stripe. Please contact support." },
 };
 
 type Props = {
@@ -51,7 +51,11 @@ export default function PayoutSetupSection({ accessToken, onStatusChange }: Prop
   };
 
   useEffect(() => {
-    loadAll();
+    // Re-sync the Stripe status first so stale labels (e.g. a resolvable
+    // "requirements" state stored as DISABLED) correct themselves on load.
+    syncConnectAccount(accessToken)
+      .catch(() => undefined)
+      .then(() => loadAll());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken]);
 
@@ -92,7 +96,7 @@ export default function PayoutSetupSection({ accessToken, onStatusChange }: Prop
   if (loading) {
     return (
       <div className="rounded-card border border-line bg-surface p-6">
-        <h2 className="text-sm font-semibold text-foreground">Payout setup</h2>
+        <h2 className="text-sm font-semibold text-foreground">Where you get paid</h2>
         <p className="mt-2 text-xs text-muted">Loading...</p>
       </div>
     );
@@ -104,11 +108,14 @@ export default function PayoutSetupSection({ accessToken, onStatusChange }: Prop
   return (
     <div className="rounded-card border border-line bg-surface p-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-foreground">Payout setup</h2>
+        <h2 className="text-sm font-semibold text-foreground">Where you get paid</h2>
         <StatusPill label={config.label} tone={config.tone} />
       </div>
 
-      <p className="mt-2 text-xs text-muted">{config.message}</p>
+      <p className="mt-2 text-xs text-muted">
+        Bank details for receiving your share of swaps. Cards for paying live under Pay with.
+      </p>
+      <p className="mt-1 text-xs text-muted">{config.message}</p>
 
       {error && (
         <p className="mt-2 text-xs text-red-500">{error}</p>

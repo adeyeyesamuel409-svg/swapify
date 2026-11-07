@@ -3,6 +3,7 @@ import { ItemStatus, PaymentStatus, Prisma, Swap, SwapStatus, prisma, ShipmentSt
 import { calculateServiceFee } from '@swapify/shared';
 import { HttpError, assertNoActiveSwap, computeGap, withSerializableRetry } from '../services/swaps.js';
 import { createSwapPaymentCheckout, getStripe, stripeEnabled, refundSwapPayment } from '../services/stripe.js';
+import { getOrCreateStripeCustomer } from '../services/stripe-payment-methods.js';
 import { notify } from '../services/notifications.js';
 import { createSwapShipments, cancelSwapShipments, hasShipmentsInMotion, markDelivered, tryCompleteSwap } from '../services/shipping.js';
 import pino from 'pino';
@@ -352,11 +353,25 @@ const swapRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
     }
 
     if (!checkout) {
+      // Attach the payer's Stripe Customer so saved cards appear at checkout
+      // and the used card is kept for next time.
+      let customerId: string | undefined;
+      if (stripeEnabled) {
+        try {
+          customerId = await getOrCreateStripeCustomer(
+            user.id,
+            user.email ?? `${user.id}@swapifyuk.com`,
+          );
+        } catch {
+          customerId = undefined;
+        }
+      }
       checkout = await createSwapPaymentCheckout(
         payment,
         higherValuePence,
         `${appOrigin()}/swaps/${swap.id}?paid=1`,
         `${appOrigin()}/swaps/${swap.id}`,
+        customerId,
       );
     }
 
