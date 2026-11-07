@@ -19,7 +19,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Swapify - Trade what you have for what you love",
   description:
-    "Turn dust-gatherers into instant upgrades with hyper-local direct swapping and smart value balancing.",
+    "Your clutter is someone else's find. Swap it nearby, and settle value gaps with a small cash top-up.",
   icons: {
     icon: [
       { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
