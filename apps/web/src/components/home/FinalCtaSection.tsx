@@ -14,8 +14,8 @@ export default function FinalCtaSection() {
             Ready to turn your clutter into something you actually want?
           </h2>
           <p className="mx-auto mt-3 max-w-xl text-white/80">
-            Join Swapify and start trading with people nearby — fair values, secure payments, and swaps
-            protected until both sides confirm.
+            Join free, list in a minute, swap with people nearby. Fair values, secure payments,
+            protected handovers.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Button

@@ -11,7 +11,7 @@ export default function DiscoveryFeedSection({ items }: { items: ApiItem[] }) {
       <SectionHeader
         eyebrow="Near you"
         title="Local discovery feed"
-        description="Fresh listings from swappers in your area — trust signals and fair-value hints built in."
+        description="Fresh listings from swappers nearby. Trust signals and fair values, built in."
         actionHref="/browse"
         actionLabel="Browse all"
       />
@@ -31,8 +31,8 @@ export default function DiscoveryFeedSection({ items }: { items: ApiItem[] }) {
           </span>
           <h3 className="mt-4 text-xl font-bold text-navy">No listings near you yet</h3>
           <p className="mx-auto mt-2 max-w-md text-sm text-muted">
-            Be the first in your area — post an item you no longer use and watch the swap offers
-            arrive. It takes about a minute.
+            Be the first on your street. List something in about a minute and watch the offers roll
+            in.
           </p>
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
             <Button href="/browse" size="md">

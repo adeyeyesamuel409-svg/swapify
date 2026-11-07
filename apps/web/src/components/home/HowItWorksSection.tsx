@@ -38,7 +38,7 @@ export default function HowItWorksSection() {
           <SectionHeader
             eyebrow="How it works"
             title="A marketplace built around trading"
-            description="Four simple steps from clutter to treasure. No haggling — just fair, protected swaps."
+            description="Four steps from clutter to treasure. No haggling, no guesswork."
           />
         </FadeUp>
 

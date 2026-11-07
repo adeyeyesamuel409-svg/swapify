@@ -215,8 +215,8 @@ function SignInForm() {
     reset: "Choose a new password",
   };
   const subtitles: Record<Mode, string> = {
-    signin: "Securely sign in to offer swaps, chat, and balance value gaps.",
-    signup: "Join a trusted community — list items and start swapping.",
+    signin: "Sign in to swap, chat, and settle value gaps.",
+    signup: "Join the neighbourhood. List something, start swapping.",
     verify: "Enter the 6-digit code we emailed you to activate your account.",
     forgot: "We'll email you a 6-digit code to reset your password.",
     reset: "Enter the code and choose a new password.",

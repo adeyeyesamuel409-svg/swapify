@@ -6,7 +6,7 @@ const POINTS = [
   {
     icon: CalendarHeart,
     title: "Swap-meet energy",
-    body: "The thrill of a great find and a fair trade — without giving up your Saturday.",
+    body: "Great finds and fair trades, no Saturday sacrificed.",
   },
   {
     icon: Leaf,
@@ -52,8 +52,8 @@ export default function CommunityBand() {
             The swap-meet feeling, minus the folding tables
           </h2>
           <p className="mt-4 max-w-lg text-muted">
-            Swapify brings the best of in-person swap events — great finds, fair trades, good
-            people — into an app that works around your schedule.
+            Great finds, fair trades, zero folding tables. All the best parts of a swap meet, on
+            your schedule.
           </p>
 
           <div className="mt-8 space-y-5">

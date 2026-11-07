@@ -83,7 +83,7 @@ export default function InboxClient({
         </span>
         <h2 className="mt-4 text-xl font-bold text-navy">No questions yet</h2>
         <p className="mx-auto mt-2 max-w-md text-sm text-muted">
-          When you ask a seller about an item — or someone asks you — the conversation shows up here.
+          When you ask a seller about an item, or someone asks you, the conversation shows up here.
         </p>
         <Link
           href="/browse"

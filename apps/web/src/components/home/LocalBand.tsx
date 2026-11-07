@@ -31,8 +31,8 @@ export default function LocalBand() {
             Swap locally — your street is the marketplace
           </h2>
           <p className="mt-4 max-w-lg text-muted">
-            Swapify connects people a few doors apart, not a few counties away. Every listing shows
-            how close it is, so great trades happen in hours.
+            Two streets away beats two counties away. See how close every listing is and swap the
+            same day.
           </p>
 
           <div className="mt-8 space-y-5">

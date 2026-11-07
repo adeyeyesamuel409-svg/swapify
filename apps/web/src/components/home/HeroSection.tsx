@@ -41,7 +41,7 @@ export default function HeroSection() {
           <FadeUp delay={0}>
             <span className="inline-flex items-center gap-1.5 rounded-pill border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary-soft">
               <Sparkles className="h-3.5 w-3.5" aria-hidden />
-              Hyper-local &middot; Fair value balancing &middot; Protected swaps
+              Hyper-local &middot; Fair trades &middot; Escrow-protected
             </span>
           </FadeUp>
 
@@ -55,8 +55,8 @@ export default function HeroSection() {
 
           <FadeUp delay={1}>
             <p className="mt-5 max-w-lg text-lg leading-relaxed text-muted">
-              Turn dust-gatherers into instant upgrades with hyper-local direct swapping and smart
-              value balancing.
+              Your clutter is someone else&apos;s find. Swap it nearby, and settle value gaps with a
+              small cash top-up.
             </p>
           </FadeUp>
 

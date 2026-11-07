@@ -18,19 +18,19 @@ export function fairnessFor(aPence: number, bPence: number): {
 
 const META: Record<FairnessLevel, { label: string; bar: string; text: string; track: string }> = {
   balanced: {
-    label: "Balanced trade",
+    label: "Balanced",
     bar: "bg-success",
     text: "text-success",
     track: "bg-success/15",
   },
   close: {
-    label: "Close — small top-up",
+    label: "Close: small top-up",
     bar: "bg-warning",
     text: "text-warning",
     track: "bg-warning/15",
   },
   unbalanced: {
-    label: "Unbalanced — cash top-up needed",
+    label: "Top-up needed",
     bar: "bg-danger",
     text: "text-danger",
     track: "bg-danger/15",

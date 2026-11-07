@@ -2,10 +2,10 @@ import { BadgeCheck, Coins, Lock, PackageCheck } from "lucide-react";
 import { FadeUp } from "../motion";
 
 const STEPS = [
-  { icon: BadgeCheck, title: "Values balanced", body: "Both item values are compared live — any difference becomes a clear cash top-up." },
+  { icon: BadgeCheck, title: "Values balanced", body: "Both values are compared live. Any difference becomes a clear cash top-up." },
   { icon: Lock, title: "Payment held in escrow", body: "The top-up is secured by Swapify the moment the swap is agreed." },
   { icon: PackageCheck, title: "Both sides confirm", body: "Items change hands. Each side confirms the swap matched what was promised." },
-  { icon: Coins, title: "Funds released", body: "Only then does the money move — refunds flow back automatically if a swap falls through." },
+  { icon: Coins, title: "Funds released", body: "Only then does the money move. If a swap falls through, it flows straight back." },
 ];
 
 export default function ProtectedBand() {
@@ -46,8 +46,8 @@ export default function ProtectedBand() {
             From handshake to handover, every swap is covered
           </h2>
           <p className="mt-4 max-w-lg text-muted">
-            Asymmetric trades used to mean awkward haggling. Swapify turns the difference into a
-            protected cash top-up that only moves when the swap really happens.
+            No awkward haggling. When values don&apos;t match, the difference becomes a cash top-up
+            that only moves when the swap really happens.
           </p>
 
           <div className="mt-8 grid gap-4 sm:grid-cols-2">
