@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Lock, MapPin, PackagePlus, ShieldCheck, Sparkles, Star } from "lucide-react";
 import Button from "../Button";
 import { DrawUnderline, FadeUp, RevealWords, SwapReveal } from "../motion";
+import HeroCarousel from "./HeroCarousel";
 import SwapMatchMotion from "./SwapMatchMotion";
 
 function SwapMotif() {
@@ -108,16 +109,7 @@ export default function HeroSection() {
 
         {/* ---------------- high-res showcase ---------------- */}
         <div className="relative mx-auto w-full max-w-[26rem] lg:max-w-none">
-          <div className="overflow-hidden rounded-[28px] border border-line shadow-raise">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/swap3.jpg"
-              alt="A swapper wheeling a rail of clothes along a brick wall"
-              width={732}
-              height={1100}
-              className="aspect-[3/4] w-full object-cover object-[center_35%]"
-            />
-          </div>
+          <HeroCarousel />
 
           {/* floating chips — balanced corners */}
           <div className="absolute left-3 top-3 sm:left-5 sm:top-5">
