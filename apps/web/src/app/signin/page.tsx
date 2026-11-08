@@ -4,7 +4,8 @@ import { useEffect, useState, Suspense } from "react";
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Repeat, ArrowRight, ShieldCheck, Lock, KeyRound, MailCheck } from "lucide-react";
+import { ArrowRight, ShieldCheck, Lock, KeyRound } from "lucide-react";
+import SwapIcon from "@/components/SwapIcon";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 8;
@@ -227,13 +228,9 @@ function SignInForm() {
       <div className="w-full max-w-md">
         <div className="rounded-card border border-line bg-surface p-6 shadow-card sm:p-8">
           <div className="flex flex-col items-center text-center">
-            <span className="flex h-12 w-12 items-center justify-center rounded-btn bg-brand text-white shadow-glow">
-              {mode === "verify" || mode === "reset" ? (
-                <MailCheck className="h-6 w-6" aria-hidden />
-              ) : (
-                <Repeat className="h-6 w-6" aria-hidden />
-              )}
-            </span>
+            <Link href="/" aria-label="Swapify home" className="inline-flex">
+              <SwapIcon className="h-12 w-12" />
+            </Link>
             <h1 className="mt-4 text-2xl font-bold tracking-tight text-navy">{titles[mode]}</h1>
             <p className="mt-1 text-sm text-muted">{subtitles[mode]}</p>
           </div>
