@@ -33,7 +33,7 @@ const SLIDES: Slide[] = [
   },
 ];
 
-const INTERVAL_MS = 5000;
+const INTERVAL_MS = 3000;
 
 /**
  * Hero photo carousel: auto-rotates every 5s with a soft crossfade + zoom,
@@ -76,26 +76,6 @@ export default function HeroCarousel() {
             transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
           />
         </AnimatePresence>
-
-        {/* slide indicators */}
-        <div className="absolute inset-x-0 bottom-2 z-10 flex items-center justify-center">
-          {SLIDES.map((s, i) => (
-            <button
-              key={s.src}
-              type="button"
-              onClick={() => setIndex(i)}
-              aria-label={`Show photo ${i + 1} of ${SLIDES.length}`}
-              aria-current={i === index}
-              className="flex h-11 w-11 items-center justify-center"
-            >
-              <span
-                className={`block h-2.5 rounded-pill transition-all ${
-                  i === index ? "w-6 bg-white shadow-card" : "w-2.5 bg-white/50 hover:bg-white/80"
-                }`}
-              />
-            </button>
-          ))}
-        </div>
       </div>
     </div>
   );
