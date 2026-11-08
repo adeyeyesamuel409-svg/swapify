@@ -42,24 +42,17 @@ const INTERVAL_MS = 3000;
 export default function HeroCarousel() {
   const reduce = useReducedMotion();
   const [index, setIndex] = useState(0);
-  const [paused, setPaused] = useState(false);
 
   useEffect(() => {
-    if (reduce || paused) return;
+    if (reduce) return;
     const id = setInterval(() => setIndex((i) => (i + 1) % SLIDES.length), INTERVAL_MS);
     return () => clearInterval(id);
-  }, [reduce, paused]);
+  }, [reduce]);
 
   const slide = SLIDES[index];
 
   return (
-    <div
-      className="overflow-hidden rounded-[28px] border border-line shadow-raise"
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
-      onFocus={() => setPaused(true)}
-      onBlur={() => setPaused(false)}
-    >
+    <div className="overflow-hidden rounded-[28px] border border-line shadow-raise">
       <div className="relative aspect-[3/4] w-full bg-surface-2">
         <AnimatePresence initial={false}>
           <motion.img
@@ -70,10 +63,10 @@ export default function HeroCarousel() {
             height={1100}
             className="absolute inset-0 h-full w-full object-cover"
             style={{ objectPosition: slide.position }}
-            initial={reduce ? false : { opacity: 0, scale: 1.05 }}
-            animate={{ opacity: 1, scale: 1 }}
+            initial={reduce ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
             exit={reduce ? undefined : { opacity: 0 }}
-            transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ duration: 1, ease: "easeInOut" }}
           />
         </AnimatePresence>
       </div>
