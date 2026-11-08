@@ -224,7 +224,7 @@ export default function PostItemPage() {
                 >
                   <ItemImage src={url} alt={`Uploaded image ${index + 1}`} />
                   {index === 0 && (
-                    <span className="absolute bottom-1 left-1 rounded-pill bg-navy/80 px-1.5 py-0.5 text-[9px] font-semibold text-white">
+                    <span className="absolute bottom-1 left-1 rounded-pill bg-black/80 px-1.5 py-0.5 text-[9px] font-semibold text-white">
                       Cover
                     </span>
                   )}
@@ -233,7 +233,7 @@ export default function PostItemPage() {
                     type="button"
                     onClick={() => setImages(images.filter((u) => u !== url))}
                     aria-label={`Remove image ${index + 1}`}
-                    className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded-full bg-navy/70 text-white transition-opacity after:absolute after:-inset-2 after:content-[''] hover:bg-danger opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+                    className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-white transition-opacity after:absolute after:-inset-2 after:content-[''] hover:bg-danger opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
                   >
                     <X className="h-3.5 w-3.5" aria-hidden />
                   </button>
@@ -243,7 +243,7 @@ export default function PostItemPage() {
                       onClick={() => moveImage(index, index - 1)}
                       disabled={index === 0}
                       aria-label="Move image left"
-                      className="relative flex h-7 w-7 items-center justify-center rounded-full bg-navy/70 text-white after:absolute after:-inset-2 after:content-[''] disabled:opacity-40"
+                      className="relative flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-white after:absolute after:-inset-2 after:content-[''] disabled:opacity-40"
                     >
                       <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
                     </button>
@@ -252,7 +252,7 @@ export default function PostItemPage() {
                       onClick={() => moveImage(index, index + 1)}
                       disabled={index === images.length - 1}
                       aria-label="Move image right"
-                      className="relative flex h-7 w-7 items-center justify-center rounded-full bg-navy/70 text-white after:absolute after:-inset-2 after:content-[''] disabled:opacity-40"
+                      className="relative flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-white after:absolute after:-inset-2 after:content-[''] disabled:opacity-40"
                     >
                       <ChevronRight className="h-3.5 w-3.5" aria-hidden />
                     </button>
