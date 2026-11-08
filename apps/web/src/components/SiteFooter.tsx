@@ -31,15 +31,15 @@ const COLUMNS: { heading: string; links: { label: string; href: string }[] }[] =
 
 export default function SiteFooter() {
   return (
-    <footer className="mt-auto bg-navy text-slate-200">
+    <footer className="mt-auto border-t border-line bg-bg text-foreground">
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
         <div className="grid gap-10 md:grid-cols-[1.5fr_repeat(3,1fr)]">
           <div>
             <Link href="/" className="flex items-center gap-2">
               <SwapIcon className="h-9 w-9" />
-              <span className="text-lg font-bold tracking-tight text-white">Swapify</span>
+              <span className="text-lg font-bold tracking-tight text-navy">Swapify</span>
             </Link>
-            <p className="mt-3 max-w-xs text-sm text-slate-400">
+            <p className="mt-3 max-w-xs text-sm text-muted">
               Trade what you have for what you love. When values don&apos;t match, a secure
               cash top-up balances the difference.
             </p>
@@ -47,11 +47,11 @@ export default function SiteFooter() {
 
           {COLUMNS.map((col) => (
             <div key={col.heading}>
-              <h3 className="text-sm font-semibold text-white">{col.heading}</h3>
+              <h3 className="text-sm font-semibold text-navy">{col.heading}</h3>
               <ul className="mt-3 space-y-2.5">
                 {col.links.map((l) => (
                   <li key={l.label}>
-                    <Link href={l.href} className="text-sm text-slate-400 transition-colors hover:text-white">
+                    <Link href={l.href} className="text-sm text-muted transition-colors hover:text-foreground">
                       {l.label}
                     </Link>
                   </li>
@@ -62,8 +62,8 @@ export default function SiteFooter() {
         </div>
 
         <div className="mt-10 flex flex-col items-start justify-between gap-3 border-t border-slate-700 pt-6 sm:flex-row sm:items-center">
-          <p className="text-xs text-slate-400">&copy; {new Date().getFullYear()} Swapify. Trade what you own, keep what you love.</p>
-          <p className="text-xs text-slate-400">Value-gap payments are held until both sides confirm the swap.</p>
+          <p className="text-xs text-muted">&copy; {new Date().getFullYear()} Swapify. Trade what you own, keep what you love.</p>
+          <p className="text-xs text-muted">Value-gap payments are held until both sides confirm the swap.</p>
         </div>
       </div>
     </footer>
