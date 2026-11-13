@@ -127,7 +127,7 @@ export default function SwapTimeline({ swap, myUserId }: Props) {
           {swap.status !== "COMPLETED" && swap.status !== "CANCELLED" && (
             <p className="mt-3 border-t border-line pt-3 text-xs text-muted">
               {iConfirmed && theyConfirmed ? (
-                "Both parties confirmed — finalizing."
+                "Both parties confirmed. Finalizing."
               ) : iConfirmed ? (
                 "You confirmed receiving your item. Waiting for the other party."
               ) : (

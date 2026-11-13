@@ -148,12 +148,12 @@ export default function SwapActions({ swap, accessToken, myUserId, sticky = fals
 
       {swap.status === "PAID" && iAmPayer && (
         <p className="mt-2 text-xs text-emerald-600 dark:text-emerald-400">
-          Payment received — value gap held until both items are delivered.
+          Payment received. The value gap is held until both items are delivered.
         </p>
       )}
       {swap.status === "PAID" && !iAmPayer && swap.gapPence > 0 && (
         <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
-          Value difference: {formatPence(swap.gapPence)} — held until both items are delivered.
+          Value difference: {formatPence(swap.gapPence)}, held until both items are delivered.
         </p>
       )}
 

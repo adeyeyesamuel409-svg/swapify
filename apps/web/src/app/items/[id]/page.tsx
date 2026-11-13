@@ -128,7 +128,7 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
             {isOwnItem && session?.accessToken && (
               <div className="mt-4 hidden sm:block">
                 <p className="mb-2 text-xs text-muted">
-                  Manage this listing — deleting removes it from the marketplace.
+                  Manage this listing. Deleting it removes it from the marketplace.
                 </p>
                 <DeleteListingButton
                   accessToken={session.accessToken}
@@ -152,7 +152,7 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
                     </Link>
                     <p className="mt-2 inline-flex w-full items-center justify-center gap-1.5 text-xs text-muted">
                       <ShieldCheck className="h-3.5 w-3.5 text-success" aria-hidden />
-                      Secure &amp; encrypted — your details are never shared
+                      Secure &amp; encrypted. Your details are never shared
                     </p>
                   </>
                 )}
@@ -168,7 +168,7 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
                 Matches your wishlist
               </p>
               <p className="mt-1 text-xs text-emerald-700/80 dark:text-emerald-200/80">
-                {matchedWishlists.map((w) => w.title).join(", ")} — send a swap request to make it yours.
+                {matchedWishlists.map((w) => w.title).join(", ")}. Send a swap request to make it yours.
               </p>
             </div>
           )}

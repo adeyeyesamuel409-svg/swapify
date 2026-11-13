@@ -161,7 +161,7 @@ function SignInForm() {
         setNewPassword("");
         setCode("");
         setMode("signin");
-        setInfo("Password updated — sign in with your new password.");
+        setInfo("Password updated. Sign in with your new password.");
         setSubmitting(false);
         return;
       }
@@ -176,12 +176,16 @@ function SignInForm() {
         const data = (await probe.json().catch(() => null)) as { error?: string } | null;
         if (data?.error === "EMAIL_NOT_VERIFIED") {
           setMode("verify");
-          setInfo(`Verify your email to continue — we sent a code to ${trimmedEmail}.`);
+          setInfo(`Verify your email to continue. We sent a code to ${trimmedEmail}.`);
           startCooldown();
           setSubmitting(false);
           return;
         }
-        setValidationError("Incorrect email or password.");
+        if (data?.error && data.error !== "Invalid email or password.") {
+          setValidationError(data.error);
+        } else {
+          setValidationError("Incorrect email or password.");
+        }
         setSubmitting(false);
         return;
       }

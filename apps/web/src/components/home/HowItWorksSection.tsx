@@ -14,7 +14,7 @@ const STEPS = [
     icon: Search,
     step: "02",
     title: "Find a match",
-    body: "Browse listings or save a wishlist — we surface items people nearby are ready to part with.",
+    body: "Browse listings or save a wishlist. We surface what people nearby are ready to part with.",
   },
   {
     icon: Repeat,

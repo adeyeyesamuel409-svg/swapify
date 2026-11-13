@@ -10,7 +10,7 @@ const POINTS = [
   {
     icon: Navigation,
     title: "Handover, not postage",
-    body: "Nearby swaps skip shipping entirely — meet locally and swap the same day.",
+    body: "Nearby swaps skip shipping entirely. Meet locally and swap the same day.",
   },
   {
     icon: ShieldCheck,
@@ -28,7 +28,7 @@ export default function LocalBand() {
             Hyper-local
           </p>
           <h2 className="mt-3 text-3xl font-bold tracking-tight text-navy sm:text-4xl">
-            Swap locally — your street is the marketplace
+            Swap locally. Your street is the marketplace.
           </h2>
           <p className="mt-4 max-w-lg text-muted">
             Two streets away beats two counties away. See how close every listing is and swap the

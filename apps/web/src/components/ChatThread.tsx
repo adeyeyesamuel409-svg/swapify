@@ -36,7 +36,7 @@ export default function ChatThread({
   onSend,
   header,
   footer,
-  emptyText = "No messages yet — say hello.",
+  emptyText = "No messages yet. Say hello.",
   readOnlyText = "Chat is read-only after the swap ends.",
 }: Props) {
   const [text, setText] = useState("");

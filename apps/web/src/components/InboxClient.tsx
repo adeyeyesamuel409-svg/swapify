@@ -182,7 +182,7 @@ export default function InboxClient({
                 </div>
               ) : null
             }
-            emptyText="Ask about condition, collection, or anything else — the seller usually replies quickly."
+            emptyText="Ask about condition, collection, or anything else. Sellers usually reply quickly."
           />
         ) : (
           <div className="flex min-h-[300px] flex-col items-center justify-center gap-3 p-10 text-center">

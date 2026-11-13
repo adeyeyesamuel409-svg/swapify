@@ -153,7 +153,7 @@ export default function InquiryChat({
                 onSend={send}
                 header={header}
                 footer={footer}
-                emptyText="Ask about condition, collection, or anything else — the seller usually replies quickly."
+                emptyText="Ask about condition, collection, or anything else. Sellers usually reply quickly."
               />
             )}
           </motion.div>

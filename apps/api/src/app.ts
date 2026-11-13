@@ -95,7 +95,7 @@ export async function buildApp(): Promise<FastifyInstance> {
     addHeadersOnExceeding: { 'x-ratelimit-limit': true, 'x-ratelimit-remaining': true },
     addHeaders: { 'x-ratelimit-limit': true, 'x-ratelimit-remaining': true, 'retry-after': true },
     errorResponseBuilder: (_request, context) => ({
-      error: 'Too many requests — please try again later',
+      error: 'Too many requests. Please wait a moment and try again.',
       statusCode: 429,
       retryAfter: Math.ceil(context.ttl / 1000),
     }),

@@ -119,7 +119,7 @@ export default function SwapBuilder({
                 </button>
                 <p className="mt-3 inline-flex items-center gap-1.5 text-xs text-muted">
                   <ShieldCheck className="h-3.5 w-3.5 text-success" aria-hidden />
-                  Secure &amp; encrypted — your details are never shared
+                  Secure &amp; encrypted. Your details are never shared
                 </p>
               </div>
             ) : created ? (

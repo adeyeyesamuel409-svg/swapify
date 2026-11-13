@@ -62,7 +62,7 @@ export default async function SellerCard({ sellerId, sellerName, sellerImageUrl 
         </div>
         <div className="rounded-btn bg-surface-2 p-3">
           <p className="text-lg font-bold text-foreground">
-            {memberSince ? memberSince.toLocaleDateString(undefined, { month: "short", year: "numeric" }) : "—"}
+            {memberSince ? memberSince.toLocaleDateString(undefined, { month: "short", year: "numeric" }) : "New"}
           </p>
           <p className="text-xs text-muted">Member since</p>
         </div>

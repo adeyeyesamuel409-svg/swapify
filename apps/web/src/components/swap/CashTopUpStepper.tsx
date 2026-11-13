@@ -88,7 +88,7 @@ export default function CashTopUpStepper({
           {balanced ? (
             <>
               <Sparkles className="mr-1 inline h-3 w-3" aria-hidden />
-              Values match — no payment
+              Values match. No payment needed
             </>
           ) : (
             `= Balanced trade (${formatPence(Math.max(myValuePence, targetValuePence))})`
@@ -98,7 +98,7 @@ export default function CashTopUpStepper({
 
       <p className="mt-3 text-center text-[11px] text-muted">
         {balanced
-          ? "Even trade — items swap hands directly."
+          ? "Even trade. Just the items change hands."
           : iPay
             ? `You'll pay ${formatPence(gap)} into escrow to balance the trade.`
             : `The owner pays ${formatPence(gap)} into escrow to even it out.`}
