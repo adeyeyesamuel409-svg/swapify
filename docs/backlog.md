@@ -3,6 +3,8 @@
 Backlog is ordered by priority. Each sprint picks the top 3-5 items.
 Legend: [ ] not started · [x] done · [-] in progress
 
+> Historical sprint log. For current status and remaining work, see [PROJECT-STATUS.md](PROJECT-STATUS.md).
+
 ## Sprint 0 - Foundations
 - [x] Create monorepo (npm workspaces), git repo, README
 - [x] Scaffold Next.js web app (`apps/web`)

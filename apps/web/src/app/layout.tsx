@@ -27,6 +27,19 @@ export const metadata: Metadata = {
     ],
     apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
+  openGraph: {
+    title: "Swapify - Trade what you have for what you love",
+    description:
+      "Your clutter is someone else's find. Swap it nearby, and settle value gaps with a small cash top-up.",
+    images: [{ url: "/og-image.png", width: 1200, height: 630, type: "image/png" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Swapify - Trade what you have for what you love",
+    description:
+      "Your clutter is someone else's find. Swap it nearby, and settle value gaps with a small cash top-up.",
+    images: ["/og-image.png"],
+  },
 };
 
 // Mobile viewport: resizes the layout when the virtual keyboard opens so

@@ -1,6 +1,6 @@
 # Swapify
 
-A barter marketplace where people swap items they no longer use for things they need. When items have unequal value, Swapify balances the difference with **tokens** that users buy or earn.
+A hyper-local barter marketplace where people swap items they no longer use for things they need. When items have unequal value, Swapify balances the difference with a small **cash top-up**, held in escrow and released only when both sides confirm the swap.
 
 ## Monorepo layout
 
@@ -13,7 +13,7 @@ swapify/
 │   ├── db/           # Prisma schema + generated client
 │   └── shared/       # Shared TypeScript types & utilities
 ├── infra/            # Docker Compose, deploy configs
-└── docs/             # Backlog, architecture, agile process
+└── docs/             # Backlog, architecture, agile process, project status
 ```
 
 ## Getting started

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#f8fafc" />
+  <g transform="translate(150 216) scale(3.1)">
+    <g transform="translate(32 32) scale(0.92) translate(-32 -32)">
+      <path d="M31 37 C22 35 15 31 13.5 24 C12 16 18 10.5 26 9.5 C33 8.8 41 10.5 45.5 13.5" fill="none" stroke="#F12A7B" stroke-width="7.5" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M44.5 20.5 L57 13.5 L44.5 6.5 Z" fill="#F12A7B" stroke="#F12A7B" stroke-width="3.5" stroke-linejoin="round" />
+      <g transform="rotate(180 32 32)">
+        <path d="M31 37 C22 35 15 31 13.5 24 C12 16 18 10.5 26 9.5 C33 8.8 41 10.5 45.5 13.5" fill="none" stroke="#3B4A6B" stroke-width="7.5" stroke-linecap="round" stroke-linejoin="round" />
+        <path d="M44.5 20.5 L57 13.5 L44.5 6.5 Z" fill="#3B4A6B" stroke="#3B4A6B" stroke-width="3.5" stroke-linejoin="round" />
+      </g>
+    </g>
+  </g>
+  <text x="392" y="308" font-family="Arial, Helvetica, sans-serif" font-size="86" font-weight="700" fill="#0f172a">Swapify</text>
+  <text x="395" y="366" font-family="Arial, Helvetica, sans-serif" font-size="30" fill="#64748b">Trade what you have for what you love.</text>
+  <rect x="395" y="398" width="132" height="7" rx="3.5" fill="#881337" />
+</svg>
