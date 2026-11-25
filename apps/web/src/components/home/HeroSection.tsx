@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Lock, MapPin, PackagePlus, ShieldCheck, Sparkles, Star } from "lucide-react";
 import Button from "../Button";
 import { DrawUnderline, FadeUp, RevealWords, SwapReveal } from "../motion";
-import HeroCarousel from "./HeroCarousel";
+import HeroFilmstrip from "./HeroFilmstrip";
 import SwapMatchMotion from "./SwapMatchMotion";
 
 function SwapMotif() {
@@ -33,12 +33,11 @@ function SwapMotif() {
 
 export default function HeroSection() {
   return (
-    <section className="bg-dots relative overflow-hidden">
+    <section className="bg-dots relative overflow-hidden pb-24 sm:pb-28">
       <SwapMotif />
 
-      <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-4 pb-20 pt-16 sm:px-6 lg:grid-cols-2 lg:gap-14 lg:pt-24 lg:px-8">
-        {/* ---------------- copy ---------------- */}
-        <div>
+      <div className="relative mx-auto max-w-7xl px-4 pt-16 sm:px-6 lg:px-8 lg:pt-20">
+        <div className="max-w-3xl">
           <FadeUp delay={0}>
             <span className="inline-flex items-center gap-1.5 rounded-pill border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary-soft">
               <Sparkles className="h-3.5 w-3.5" aria-hidden />
@@ -46,7 +45,7 @@ export default function HeroSection() {
             </span>
           </FadeUp>
 
-          <h1 className="mt-5 text-4xl font-bold leading-[1.06] tracking-tight text-navy sm:text-5xl lg:text-[3.4rem]">
+          <h1 className="mt-5 text-4xl font-bold leading-[1.06] tracking-tight text-navy sm:text-5xl lg:text-[3.6rem]">
             <RevealWords text="Trade What You Have." delay={0.15} />{" "}
             <SwapReveal className="relative" delay={0.8}>
               <span className="text-accent">Get What You Love.</span>
@@ -106,13 +105,14 @@ export default function HeroSection() {
             </div>
           </FadeUp>
         </div>
+      </div>
 
-        {/* ---------------- high-res showcase ---------------- */}
-        <div className="relative mx-auto w-full max-w-[26rem] lg:max-w-none">
-          <HeroCarousel />
+      {/* ---------------- photo filmstrip (full-bleed) ---------------- */}
+      <div className="relative mt-12">
+        <HeroFilmstrip />
 
-          {/* floating chips — balanced corners */}
-          <div className="absolute left-3 top-3 sm:left-5 sm:top-5">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute left-4 top-3 sm:left-8">
             <div className="glass flex items-center gap-2 rounded-pill px-3.5 py-2 shadow-card">
               <Star className="h-3.5 w-3.5 fill-token-soft text-token-soft" aria-hidden />
               <span className="text-xs font-semibold text-navy">4.9</span>
@@ -120,15 +120,14 @@ export default function HeroSection() {
             </div>
           </div>
 
-          <div className="absolute right-3 top-3 sm:right-5 sm:top-5">
+          <div className="absolute right-4 top-3 sm:right-8">
             <div className="glass flex items-center gap-2 rounded-pill px-3.5 py-2 shadow-card">
               <ShieldCheck className="h-3.5 w-3.5 text-success" aria-hidden />
               <span className="text-xs font-semibold text-navy">Escrow protected</span>
             </div>
           </div>
 
-          {/* signature swap motion (carries proximity + top-up context) */}
-          <div className="absolute -bottom-6 left-3 sm:-bottom-8 sm:left-6">
+          <div className="absolute -bottom-10 left-4 hidden sm:left-8 sm:block">
             <SwapMatchMotion />
           </div>
         </div>
