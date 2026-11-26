@@ -14,8 +14,8 @@ export default function FinalCtaSection() {
             Ready to turn your clutter into something you actually want?
           </h2>
           <p className="mx-auto mt-3 max-w-xl text-white/80">
-            Join free, list in a minute, swap with people nearby. Fair values, secure payments,
-            protected handovers.
+            Find something nearby. List something today. Fair values, secure payments, protected
+            handovers.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Button
@@ -23,7 +23,7 @@ export default function FinalCtaSection() {
               size="lg"
               className="bg-white text-primary-strong hover:bg-white/90"
             >
-              Explore listings
+              Explore Swaps Near You
               <ArrowRight className="h-4.5 w-4.5" aria-hidden />
             </Button>
             <Button
@@ -33,7 +33,7 @@ export default function FinalCtaSection() {
               className="border-white/40 bg-white/10 text-white hover:bg-white/20"
             >
               <PackagePlus className="h-4.5 w-4.5" aria-hidden />
-              Post an item
+              List an Item in 60s
             </Button>
           </div>
         </div>

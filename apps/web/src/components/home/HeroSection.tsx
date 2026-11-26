@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { Lock, MapPin, PackagePlus, ShieldCheck, Sparkles, Star } from "lucide-react";
+import { Lock, PackagePlus, ShieldCheck, Sparkles, Star } from "lucide-react";
 import Button from "../Button";
 import { DrawUnderline, FadeUp, RevealWords, SwapReveal } from "../motion";
 import HeroFilmstrip from "./HeroFilmstrip";
+import HeroSearch from "./HeroSearch";
 import SwapMatchMotion from "./SwapMatchMotion";
 
 function SwapMotif() {
@@ -61,15 +62,13 @@ export default function HeroSection() {
           </FadeUp>
 
           <FadeUp delay={1.15}>
-            <div className="mt-8 flex flex-wrap items-center gap-3">
-              <Button href="/browse" size="lg">
-                <MapPin className="h-4.5 w-4.5" aria-hidden />
-                Explore Swaps Near You
-              </Button>
+            <HeroSearch />
+            <div className="mt-4 flex flex-wrap items-center gap-3">
               <Button href="/post" size="lg" variant="secondary">
                 <PackagePlus className="h-4.5 w-4.5" aria-hidden />
-                Post an item
+                List an Item in 60s
               </Button>
+              <span className="text-sm text-muted">or scroll to explore what&apos;s swapping nearby</span>
             </div>
           </FadeUp>
 

@@ -1,9 +1,10 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession, signIn } from "next-auth/react";
 import { createItem, formatPence, uploadImages } from "@/lib/api";
+import { takePendingPhoto } from "@/lib/pending-photo";
 import ItemImage from "@/components/ItemImage";
 import MobileActionBar from "@/components/MobileActionBar";
 import { CATEGORIES, CONDITIONS, CATEGORY_LABELS, CONDITION_LABELS } from "@swapify/shared";
@@ -44,27 +45,7 @@ export default function PostItemPage() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  if (status === "loading") return <p className="mx-auto mt-20 text-muted">Loading...</p>;
-
-  if (!session?.accessToken) {
-    return (
-      <main className="mx-auto max-w-xl flex-1 px-6 py-16 text-center">
-        <h1 className="text-2xl font-bold text-navy">Sign in to post an item</h1>
-        <p className="mt-2 text-muted">
-          <button onClick={() => signIn(undefined, { callbackUrl: window.location.pathname })} className="text-primary-soft hover:underline">
-            Sign in
-          </button>{" "}
-          to list your first item.
-        </p>
-        <p className="mt-3 inline-flex items-center gap-1.5 text-xs text-muted">
-          <ShieldCheck className="h-3.5 w-3.5 text-success" aria-hidden />
-          Secure &amp; encrypted. Your details are never shared
-        </p>
-      </main>
-    );
-  }
-
-  const pickFiles = async (files: FileList | null) => {
+  const pickFiles = async (files: FileList | File[] | null) => {
     if (!files || files.length === 0) return;
     setError("");
     setUploading(true);
@@ -85,7 +66,9 @@ export default function PostItemPage() {
           return;
         }
       }
-      const uploaded = await uploadImages(session.accessToken!, accepted);
+      const token = session?.accessToken;
+      if (!token) return;
+      const uploaded = await uploadImages(token, accepted);
       setImages((imgs) => [...imgs, ...uploaded.map((f) => f.url)]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to upload images");
@@ -102,6 +85,38 @@ export default function PostItemPage() {
     next.splice(to, 0, moved);
     setImages(next);
   };
+
+  // Camera shortcut: a photo captured by the hero camera button is handed over
+  // here and lands straight in the uploader.
+  useEffect(() => {
+    const pending = takePendingPhoto();
+    if (!pending) return;
+    const timer = setTimeout(() => {
+      void pickFiles([pending]);
+    }, 0);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (status === "loading") return <p className="mx-auto mt-20 text-muted">Loading...</p>;
+
+  if (!session?.accessToken) {
+    return (
+      <main className="mx-auto max-w-xl flex-1 px-6 py-16 text-center">
+        <h1 className="text-2xl font-bold text-navy">Sign in to post an item</h1>
+        <p className="mt-2 text-muted">
+          <button onClick={() => signIn(undefined, { callbackUrl: window.location.pathname })} className="text-primary-soft hover:underline">
+            Sign in
+          </button>{" "}
+          to list your first item.
+        </p>
+        <p className="mt-3 inline-flex items-center gap-1.5 text-xs text-muted">
+          <ShieldCheck className="h-3.5 w-3.5 text-success" aria-hidden />
+          Secure &amp; encrypted. Your details are never shared
+        </p>
+      </main>
+    );
+  }
 
   const addImageUrl = () => {
     const url = form.imageUrl.trim();

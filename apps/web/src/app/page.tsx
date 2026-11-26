@@ -1,12 +1,10 @@
 import { fetchItems, type ApiItem } from "@/lib/api";
 import HeroSection from "@/components/home/HeroSection";
 import StatsStrip from "@/components/home/StatsStrip";
-import CategoryStrip from "@/components/home/CategoryStrip";
+import CategoryAnchors from "@/components/home/CategoryAnchors";
 import DiscoveryFeedSection from "@/components/home/DiscoveryFeedSection";
-import CommunityBand from "@/components/home/CommunityBand";
-import LocalBand from "@/components/home/LocalBand";
-import HowItWorksSection from "@/components/home/HowItWorksSection";
-import ProtectedBand from "@/components/home/ProtectedBand";
+import LocalCommunityBand from "@/components/home/LocalCommunityBand";
+import HowItWorksProtectedBand from "@/components/home/HowItWorksProtectedBand";
 import FinalCtaSection from "@/components/home/FinalCtaSection";
 
 export default async function Home() {
@@ -24,12 +22,10 @@ export default async function Home() {
     <>
       <HeroSection />
       <StatsStrip />
-      <CategoryStrip />
+      <CategoryAnchors />
       <DiscoveryFeedSection items={active} />
-      <CommunityBand />
-      <LocalBand />
-      <HowItWorksSection />
-      <ProtectedBand />
+      <LocalCommunityBand />
+      <HowItWorksProtectedBand />
       <FinalCtaSection />
     </>
   );
