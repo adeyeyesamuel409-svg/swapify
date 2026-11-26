@@ -1,6 +1,5 @@
 import { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { prisma } from '@swapify/db';
-import { HttpError } from '../services/swaps.js';
 import { notify } from '../services/notifications.js';
 
 const itemParamsSchema = {
